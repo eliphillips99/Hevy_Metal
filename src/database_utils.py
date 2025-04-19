@@ -6,7 +6,7 @@ DATABASE_NAME = "hevy_metal.db"
 def get_connection():
     """Establishes and returns a connection to the SQLite database."""
     try:
-        conn = sqlite3.connect(DATABASE_NAME)
+        conn = sqlite3.connect(hevy_metal.db)
         conn.row_factory = sqlite3.Row  # Access columns by name
         return conn
     except sqlite3.Error as e:
