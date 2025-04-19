@@ -1,0 +1,19 @@
+workout-analytics/
+├── .gitignore          # Specifies intentionally untracked files that Git should ignore
+├── README.md           # Project overview and setup instructions
+├── data/               # Directory to store raw and processed data (gitignore this if it contains sensitive personal data)
+├── notebooks/          # Jupyter notebooks for exploration and experimentation
+├── scripts/            # Python scripts for data acquisition, processing, and analysis
+│   ├── hevy_api.py     # Scripts for interacting with the Hevy API
+│   ├── apple_health.py # Scripts for processing Apple Health data
+│   ├── data_ingestion.py # Scripts to load data into your database
+│   ├── analysis.py     # Scripts for feature engineering and analysis
+│   └── gemini_integration.py # Scripts for interacting with the Gemini AI
+├── database/           # (Optional) Directory for database setup scripts or migrations
+├── dashboards/         # Code for your web-based dashboards (Flask, Streamlit, etc.)
+│   ├── app.py          # Main dashboard application file
+│   ├── templates/      # HTML templates (if using Flask/Django)
+│   └── static/         # CSS, JavaScript, images (if using Flask/Django)
+├── config/             # Configuration files (e.g., API keys, database connection strings) - be careful not to commit sensitive info directly!
+├── requirements.txt    # List of Python dependencies
+└── LICENSE             # Project license (e.g., MIT, Apache 2.0)
