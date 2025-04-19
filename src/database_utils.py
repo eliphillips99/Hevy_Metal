@@ -1,12 +1,15 @@
 # workout-analytics/database_utils.py
 import sqlite3
+import os
 
-DATABASE_NAME = "hevy_metal.db"
+# Dynamically construct the path to the database file in the 'data' directory
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DATABASE_NAME = os.path.join(BASE_DIR, "data", "hevy_metal.db")
 
 def get_connection():
     """Establishes and returns a connection to the SQLite database."""
     try:
-        conn = sqlite3.connect(hevy_metal.db)
+        conn = sqlite3.connect(DATABASE_NAME)
         conn.row_factory = sqlite3.Row  # Access columns by name
         return conn
     except sqlite3.Error as e:
