@@ -1,58 +1,33 @@
 # workout-analytics/database_utils.py
-import sqlite3
-import os
+from sqlalchemy import create_engine, MetaData
+from sqlalchemy.orm import sessionmaker
 
-# Dynamically construct the path to the database file in the 'data' directory
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DATABASE_NAME = os.path.join(BASE_DIR, "data", "hevy_metal.db")
+DATABASE_NAME = "hevy_metal.db"
+engine = create_engine(f'sqlite:///{DATABASE_NAME}')
+metadata = MetaData() # You might define your tables here or in queries.py
 
-def get_connection():
-    """Establishes and returns a connection to the SQLite database."""
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+def get_db():
+    db = SessionLocal()
     try:
-        conn = sqlite3.connect(DATABASE_NAME)
-        conn.row_factory = sqlite3.Row  # Access columns by name
-        return conn
-    except sqlite3.Error as e:
-        print(f"Database connection error: {e}")
-        return None
+        yield db
+    finally:
+        db.close()
 
-def close_connection(conn):
-    """Closes the database connection."""
-    if conn:
-        conn.close()
+def execute_sqlalchemy_query(db, query):
+    """Executes a SQLAlchemy query object."""
+    result = db.execute(query).fetchall()
+    return result
 
-def execute_query(query, params=()):
-    """Executes an SQL query and returns the results."""
-    conn = get_connection()
-    if conn:
-        try:
-            cursor = conn.cursor()
-            cursor.execute(query, params)
-            results = cursor.fetchall()
-            conn.commit()  # For INSERT, UPDATE, DELETE
-            return results
-        except sqlite3.Error as e:
-            print(f"Database query error: {e}")
-            return None
-        finally:
-            close_connection(conn)
-    return None
+# Import all functions from hevy_sql_queries
+from hevy_sql_queries import *
 
-def fetch_one(query, params=()):
-    """Executes an SQL query and returns the first result."""
-    results = execute_query(query, params)
-    if results:
-        return results[0]
-    return None
-
-def fetch_all(query, params=()):
-    """Executes an SQL query and returns all results."""
-    return execute_query(query, params)
-
+# Example usage
 if __name__ == "__main__":
-    # Example usage (optional)
-    unique_exercises = fetch_all("SELECT DISTINCT exercise_name FROM exercises;")
-    if unique_exercises:
-        print("Unique Exercises:")
-        for row in unique_exercises:
-            print(row['exercise_name'])
+    db = next(get_db())
+    exercise_counts_results = execute_sqlalchemy_query(db, get_exercise_counts_query())
+    if exercise_counts_results:
+        print("Exercise Counts:")
+        for row in exercise_counts_results:
+            print(f"{row.exercise_name}: {row.occurrence_count}")
