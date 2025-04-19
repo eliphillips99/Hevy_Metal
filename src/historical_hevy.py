@@ -33,21 +33,22 @@ def fetch_all_hevy_workouts():
             # Log the structure of the response for debugging
             print(f"API response: {json.dumps(data, indent=2)[:500]}")  # Log the first 500 characters
 
-            workouts = data.get("items", [])
+            # Correctly access the 'workouts' key in the response
+            workouts = data.get("workouts", [])
             if not isinstance(workouts, list):
-                print("Unexpected data format: 'items' is not a list.")
+                print("Unexpected data format: 'workouts' is not a list.")
                 break
 
             all_workouts.extend(workouts)
             print(f"Fetched {len(workouts)} workouts.")  # Log the number of workouts fetched
 
-            next_page_url = data.get("next_page")
-            if not next_page_url and 'Link' in response.headers:
-                links = requests.utils.parse_header_links(response.headers['Link'])
-                for link in links:
-                    if link['rel'] == 'next':
-                        next_page_url = link['url']
-                        break
+            # Handle pagination
+            current_page = data.get("page")
+            page_count = data.get("page_count")
+            if current_page and page_count and current_page < page_count:
+                next_page_url = f"{BASE_URL}/workouts?page={current_page + 1}"
+            else:
+                next_page_url = None
 
             import time
             time.sleep(0.1)  # Avoid hitting API rate limits
