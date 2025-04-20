@@ -64,7 +64,60 @@ def fetch_all_hevy_workouts():
 
     return all_workouts
 
-def store_workouts_in_sqlite(workouts):
+def recreate_workouts_table(cursor):
+    """Recreates the workouts table with the updated schema."""
+    # Check if the workouts table exists
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='workouts'")
+    table_exists = cursor.fetchone()
+
+    if table_exists:
+        # Rename the existing table
+        cursor.execute("ALTER TABLE workouts RENAME TO old_workouts")
+
+        # Create the new table with the updated schema
+        cursor.execute("""
+        CREATE TABLE workouts (
+            workout_id TEXT PRIMARY KEY,
+            title TEXT,
+            description TEXT,
+            start_time TEXT,
+            end_time TEXT,
+            workout_date TEXT,  -- Add this column
+            routine_title TEXT,
+            created_at TEXT,
+            updated_at TEXT
+        )
+        """)
+
+        # Copy data from the old table to the new table
+        cursor.execute("""
+        INSERT INTO workouts (workout_id, title, description, start_time, end_time, workout_date, routine_title, created_at, updated_at)
+        SELECT workout_id, title, description, start_time, end_time, 
+               substr(start_time, 1, 10) AS workout_date,  -- Extract date from start_time
+               routine_title, created_at, updated_at
+        FROM old_workouts
+        """)
+
+        # Drop the old table
+        cursor.execute("DROP TABLE old_workouts")
+    else:
+        print("The workouts table does not exist. Creating a new table...")
+        # Create the new table with the updated schema
+        cursor.execute("""
+        CREATE TABLE workouts (
+            workout_id TEXT PRIMARY KEY,
+            title TEXT,
+            description TEXT,
+            start_time TEXT,
+            end_time TEXT,
+            workout_date TEXT,  -- Add this column
+            routine_title TEXT,
+            created_at TEXT,
+            updated_at TEXT
+        )
+        """)
+
+def store_workouts_in_sqlite(workouts, rebuild=False):
     """Stores Hevy workout data in a SQLite database with relational tables."""
     if not workouts:
         print("No workouts to store in the database.")
@@ -73,20 +126,18 @@ def store_workouts_in_sqlite(workouts):
     conn = sqlite3.connect(DATABASE_NAME)
     cursor = conn.cursor()
 
-    # Create workouts table
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS workouts (
-        workout_id TEXT PRIMARY KEY,
-        title TEXT,
-        description TEXT,
-        start_time TEXT,
-        end_time TEXT,
-        routine_title TEXT,
-        created_at TEXT,
-        updated_at TEXT
-    )
-    """)
-    conn.commit()
+    # Rebuild the workouts table if requested
+    if rebuild:
+        print("Rebuilding the workouts table...")
+        cursor.execute("DROP TABLE IF EXISTS workouts")
+        recreate_workouts_table(cursor)
+
+    # Check if the workouts table exists and has the workout_date column
+    cursor.execute("PRAGMA table_info(workouts)")
+    columns = [col[1] for col in cursor.fetchall()]
+    if "workout_date" not in columns:
+        print("Recreating the workouts table to add the workout_date column...")
+        recreate_workouts_table(cursor)
 
     # Create exercises table
     cursor.execute("""
@@ -141,15 +192,16 @@ def store_workouts_in_sqlite(workouts):
         description = workout.get("description")
         start_time = workout.get("start_time")
         end_time = workout.get("end_time")
+        workout_date = start_time.split("T")[0] if start_time else None  # Extract date from start_time
         created_at = workout.get("created_at")
         updated_at = workout.get("updated_at")
         routine_title = workout.get("title")  # Assuming title often is routine name
 
         try:
             cursor.execute("""
-            INSERT OR IGNORE INTO workouts (workout_id, title, description, start_time, end_time, routine_title, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """, (workout_id, title, description, start_time, end_time, routine_title, created_at, updated_at))
+            INSERT OR IGNORE INTO workouts (workout_id, title, description, start_time, end_time, workout_date, routine_title, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (workout_id, title, description, start_time, end_time, workout_date, routine_title, created_at, updated_at))
         except sqlite3.IntegrityError:
             pass
 
@@ -202,7 +254,7 @@ def store_workouts_in_sqlite(workouts):
     conn.close()
     print(f"Successfully stored {len(workouts)} workouts in {DATABASE_NAME}")
 
-def main():
+def main(rebuild=False):
     # Fetch all workouts from Hevy API
     workouts = fetch_all_hevy_workouts()
     if not workouts:
@@ -210,10 +262,11 @@ def main():
         return
 
     # Store the fetched workouts in SQLite database
-    store_workouts_in_sqlite(workouts)
+    store_workouts_in_sqlite(workouts, rebuild=rebuild)
     print(f"Stored {len(workouts)} workouts in the database.")
 
 if __name__ == "__main__":
     print("Starting the Hevy data fetch and store process...")  # Log script start
-    main()
+    rebuild = input("Do you want to rebuild the workouts table? (yes/no): ").strip().lower() == "yes"
+    main(rebuild=rebuild)
     print("Process completed.")  # Log script completion

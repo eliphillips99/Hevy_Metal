@@ -5,13 +5,13 @@ import datetime
 from schema import metadata, exercises_table, workouts_table, workout_exercises_table, sets_table, sleep_records_table, nutrition_records_table
 from sqlalchemy import and_
 
-def apply_date_filter(query, workouts_table, start_date=None, end_date=None):
+def apply_date_filter(query, workout_table, start_date=None, end_date=None):
     """Applies a date range filter to a SQLAlchemy query involving the workouts table."""
     conditions = []
     if start_date:
-        conditions.append(workouts_table.c.workout_date >= start_date)
+        conditions.append(workout_table.c.workout_date >= start_date)
     if end_date:
-        conditions.append(workouts_table.c.workout_date <= end_date)
+        conditions.append(workout_table.c.workout_date <= end_date)
 
     if conditions:
         return query.where(and_(*conditions))
@@ -24,7 +24,7 @@ def get_all_workouts_query(start_date=None, end_date=None):
         workouts_table.c.title,
         workouts_table.c.start_time,
         workouts_table.c.end_time,
-        workouts_table.c.workout_date
+        workouts_table.c.workout_date  # Include workout_date
     ).order_by(workouts_table.c.start_time.desc())
 
     return apply_date_filter(query, workouts_table, start_date, end_date)
@@ -62,10 +62,11 @@ def get_exercise_counts_query(start_date=None, end_date=None):
     """Returns a query for counting the occurrences of each exercise."""
     query = select(exercises_table.c.exercise_name, func.count(workout_exercises_table.c.exercise_id).label('occurrence_count')).\
         join(workout_exercises_table, exercises_table.c.exercise_id == workout_exercises_table.c.exercise_id).\
+        join(workouts_table, workout_exercises_table.c.workout_id == workouts_table.c.workout_id).\
         group_by(exercises_table.c.exercise_name).\
         order_by(func.count(workout_exercises_table.c.exercise_id).desc())
-
-    return apply_date_filter(query, workout_exercises_table, start_date, end_date)
+    
+    return apply_date_filter(query, workouts_table, start_date, end_date)
 # More query functions using SQLAlchemy Core
 
 
