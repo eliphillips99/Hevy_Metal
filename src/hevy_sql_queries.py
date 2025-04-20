@@ -1,8 +1,8 @@
 # workout-analytics/queries.py
-from sqlalchemy import MetaData, Table, Column, Integer, String, ForeignKey, select, and_, func
+from sqlalchemy import MetaData, Table, Column, Integer, String, ForeignKey, select, func
+from sqlalchemy.types import DateTime, Date  # Correct import for DateTime and Date
 import datetime
-from sqlalchemy.sql import DateTime, Date
-from .schema import metadata, exercises_table, workouts_table, workout_exercises_table, sets_table, sleep_records_table, nutrition_records_table
+from schema import metadata, exercises_table, workouts_table, workout_exercises_table, sets_table, sleep_records_table, nutrition_records_table
 from sqlalchemy import and_
 
 def apply_date_filter(query, workouts_table, start_date=None, end_date=None):
