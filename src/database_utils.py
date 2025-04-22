@@ -50,6 +50,37 @@ def get_exercise_counts(db: Session, start_date: date = None, end_date: date = N
     query = get_exercise_counts_query(start_date, end_date)
     return fetch_all(db, query)
 
+# Diet Cycle related functions
+def insert_diet_cycle(db: Session, start_date: date, cycle_type: str, end_date: date = None, notes: str = None):
+    query = insert_diet_cycle_query(start_date, cycle_type, end_date, notes)
+    db.execute(query)
+    db.commit()
+    return "Diet cycle recorded."
+
+def end_diet_cycle(db: Session, cycle_id: int, end_date: date):
+    query = update_diet_cycle_end_date_query(cycle_id, end_date)
+    result = db.execute(query)
+    db.commit()
+    return f"Diet cycle {cycle_id} ended on {end_date}."
+
+def submit_end_diet_cycle(db: Session, cycle_id: int, end_date: date):
+    """
+    Submits the end date for a diet cycle and updates the database.
+    """
+    try:
+        result = end_diet_cycle(db, cycle_id, end_date)
+        print(result)  # Replace with appropriate logging or UI feedback
+    except Exception as e:
+        print(f"Error ending diet cycle: {e}")  # Replace with appropriate error handling
+
+def get_current_diet_cycle(db: Session, on_date: date = None):
+    query = get_current_diet_cycle_query(on_date)
+    return fetch_one(db, query)
+
+def get_all_diet_cycles(db: Session, start_date: date = None, end_date: date = None):
+    query = get_all_diet_cycles_query(start_date, end_date)
+    return fetch_all(db, query)
+
 # Add corresponding functions for other queries in queries.py here
 # Example for sleep records (assuming you'll create these queries):
 # def get_latest_sleep_record(db: Session, start_date: date = None, end_date: date = None):
@@ -64,6 +95,8 @@ if __name__ == "__main__":
     from sqlalchemy.orm import Session
 
     def main():
+        metadata.create_all(engine)
+
         db: Session = next(get_db())
         try:
 

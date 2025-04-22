@@ -68,3 +68,11 @@ nutrition_records_table = Table('nutrition_records', metadata,
     Column('created_at', DateTime),
     Column('updated_at', DateTime)
 )
+
+diet_cycles_table = Table('diet_cycles', metadata,
+    Column('cycle_id', Integer, primary_key=True),
+    Column('start_date', Date, nullable=False),
+    Column('end_date', Date),  # Can be NULL if the cycle is ongoing
+    Column('cycle_type', String, nullable=False),  # 'cut' or 'bulk'
+    Column('notes', String)
+)

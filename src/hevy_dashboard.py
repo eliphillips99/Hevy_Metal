@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from database_utils import get_db, get_all_workouts, get_exercise_counts
+from database_utils import *
 from datetime import date
 
 st.title("Hevy Workout Analytics")
@@ -34,3 +34,64 @@ if exercise_counts:
     st.bar_chart(df_exercise_counts.set_index('exercise_name'), height=500)
 else:
     st.info("No exercise data found.")
+
+st.title("Hevy Workout Analytics")
+
+# ... (rest of your dashboard code - workout history, exercise frequency, etc.) ...
+
+st.sidebar.header("Diet Cycle Management")
+
+with st.sidebar.form("new_diet_cycle_form"):
+    st.subheader("Start New Diet Cycle")
+    start_date = st.date_input("Start Date", date.today())
+    cycle_type = st.selectbox("Cycle Type", ["bulk", "cut"])
+    notes = st.text_input("Notes (optional)")
+    submitted_start = st.form_submit_button("Start Cycle")
+    if submitted_start:
+        db = next(get_db())
+        result = insert_diet_cycle(db, start_date, cycle_type, notes=notes)
+        st.success(result)
+        db.close()
+        st.experimental_rerun()  # Refresh the app to show updated data
+
+with st.sidebar.form("end_current_cycle_form"):
+    st.subheader("End Current Diet Cycle")
+    db = next(get_db())
+    current_cycle = get_current_diet_cycle(db)
+    db.close()
+    if current_cycle:
+        cycle_id = current_cycle.cycle_id
+        end_date = st.date_input("End Date", date.today())
+        # Ensure the submit button is properly placed
+        submitted_end = st.form_submit_button(f"End Cycle {cycle_id}")
+        if submitted_end:
+            db = next(get_db())
+            result = end_diet_cycle(db, cycle_id, end_date)
+            st.success(result)
+            db.close()
+            st.experimental_rerun()  # Refresh the app to show updated data
+    else:
+        st.info("No current diet cycle recorded.")
+
+st.subheader("Current Diet Cycle")
+db = next(get_db())
+current_cycle_data = get_current_diet_cycle(db)
+db.close()
+if current_cycle_data:
+    st.write(f"**Current Cycle:** {current_cycle_data.cycle_type.upper()}")
+    st.write(f"**Start Date:** {current_cycle_data.start_date}")
+    if current_cycle_data.end_date:
+        st.write(f"**End Date:** {current_cycle_data.end_date}")
+    if current_cycle_data.notes:
+        st.write(f"**Notes:** {current_cycle_data.notes}")
+else:
+    st.info("No diet cycle information recorded yet.")
+
+st.subheader("All Diet Cycles")
+db = next(get_db())
+all_cycles_data = get_all_diet_cycles(db)
+db.close()
+if all_cycles_data:
+    st.dataframe(pd.DataFrame(all_cycles_data))
+else:
+    st.info("No diet cycle history recorded.")
