@@ -4,6 +4,7 @@ from sqlalchemy.orm import sessionmaker, Session
 from datetime import date
 import os
 from src.database.queries.hevy_sql_queries import *
+from src.database.queries.diet_cycle_queries import *
 
 #DATABASE_NAME = os.path.join("data", "hevy_metal.db")  # Updated to point to the data directory
 DATABASE_NAME = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../data/hevy_metal.db"))
@@ -122,10 +123,12 @@ if __name__ == "__main__":
             for exercise_name in unique_exercises:
                 print(exercise_name.exercise_name)'''
 
-            print("\n--- Exercise Counts ---")
+            '''print("\n--- Exercise Counts ---")
             exercise_counts = get_exercise_counts(db)
             for row in exercise_counts:
-                print(f"{row.exercise_name}: {row.occurrence_count}")
+                print(f"{row.exercise_name}: {row.occurrence_count}")'''
+            
+            print("Run Sucessfully")
 
         finally:
             db.close()
