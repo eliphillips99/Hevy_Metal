@@ -2,7 +2,7 @@
 from sqlalchemy import create_engine, MetaData
 from sqlalchemy.orm import sessionmaker, Session
 from datetime import date
-from database.queries import *  # Updated to reflect the new location of queries
+from src.database.queries.hevy_sql_queries import * # Import all query functions
 import os
 
 DATABASE_NAME = os.path.join("data", "hevy_metal.db")  # Updated to point to the data directory

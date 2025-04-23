@@ -2,7 +2,7 @@
 from sqlalchemy import MetaData, Table, Column, Integer, String, ForeignKey, select, func
 from sqlalchemy.types import DateTime, Date  # Correct import for DateTime and Date
 import datetime
-from schema import metadata, exercises_table, workouts_table, workout_exercises_table, sets_table, sleep_records_table, nutrition_records_table, diet_cycles_table
+from src.database.schema import metadata, exercises_table, workouts_table, workout_exercises_table, sets_table, sleep_records_table, nutrition_records_table, diet_cycles_table
 from sqlalchemy import and_
 
 def apply_date_filter(query, table, start_date=None, end_date=None, date_column='workout_date'):
