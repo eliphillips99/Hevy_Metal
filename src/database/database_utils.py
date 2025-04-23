@@ -2,10 +2,11 @@
 from sqlalchemy import create_engine, MetaData
 from sqlalchemy.orm import sessionmaker, Session
 from datetime import date
-from src.database.queries.hevy_sql_queries import * # Import all query functions
 import os
+from src.database.queries.hevy_sql_queries import *
 
-DATABASE_NAME = os.path.join("data", "hevy_metal.db")  # Updated to point to the data directory
+#DATABASE_NAME = os.path.join("data", "hevy_metal.db")  # Updated to point to the data directory
+DATABASE_NAME = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../data/hevy_metal.db"))
 engine = create_engine(f'sqlite:///{DATABASE_NAME}')
 metadata = MetaData() # You might define your tables in a separate schema file
 
