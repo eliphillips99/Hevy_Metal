@@ -3,31 +3,38 @@ from sqlalchemy import MetaData, Table, Column, Integer, String, Float, DateTime
 
 metadata = MetaData()
 
+common_data = Table('common_data', metadata,
+    Column('common_data_id', Integer, primary_key=True),
+    Column('date', DateTime, nullable=False),
+    Column('source', String),
+)
+
+workouts_table = Table('workouts', metadata,
+    Column('common_data_id', Integer, ForeignKey('common_data.common_data_id'), nullable=False),
+    Column('workout_id', String, primary_key=True, autoincrement=True),
+    Column('workout_name', String),
+    Column('workout_description', String),
+    Column('start_time', DateTime),
+    Column('end_time', DateTime),
+    Column('duration', Float),
+    Column('routine_title', String),
+    Column('created_at', DateTime),
+    Column('updated_at', DateTime),
+)
+
 exercises_table = Table('exercises', metadata,
     Column('exercise_id', Integer, primary_key=True),
     Column('hevy_exercise_template_id', String, unique=True, nullable=False),
     Column('exercise_name', String, nullable=False)
 )
 
-workouts_table = Table('workouts', metadata,
-    Column('workout_id', String, primary_key=True),
-    Column('title', String),
-    Column('description', String),
-    Column('start_time', DateTime),
-    Column('end_time', DateTime),
-    Column('routine_title', String),
-    Column('created_at', DateTime),
-    Column('updated_at', DateTime),
-    Column('workout_date', Date)
-)
-
 workout_exercises_table = Table('workout_exercises', metadata,
-    Column('workout_exercise_id', Integer, primary_key=True),
+    Column('order', Integer, primary_key=True),
     Column('workout_id', String, ForeignKey('workouts.workout_id'), nullable=False),
     Column('exercise_id', Integer, ForeignKey('exercises.exercise_id'), nullable=False),
     Column('exercise_index', Integer, nullable=False),
     Column('exercise_notes', String),
-    Column('superset_id', Integer)
+    Column('superset_id', Integer),
 )
 
 sets_table = Table('sets', metadata,
