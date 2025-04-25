@@ -29,7 +29,6 @@ exercises_table = Table('exercises', metadata,
 )
 
 workout_exercises_table = Table('workout_exercises', metadata,
-    Column('order', Integer, primary_key=True),
     Column('workout_id', String, ForeignKey('workouts.workout_id'), nullable=False),
     Column('exercise_id', Integer, ForeignKey('exercises.exercise_id'), nullable=False),
     Column('exercise_index', Integer, nullable=False),
@@ -39,16 +38,23 @@ workout_exercises_table = Table('workout_exercises', metadata,
 
 sets_table = Table('sets', metadata,
     Column('set_id', Integer, primary_key=True),
-    Column('workout_exercise_id', Integer, ForeignKey('workout_exercises.workout_exercise_id'), nullable=False),
+    Column('exercise_id', Integer, ForeignKey('exercises.exercise_id'), nullable=False),
     Column('set_index', Integer, nullable=False),
     Column('set_type', String),
     Column('weight_kg', Float),
     Column('reps', Integer),
-    Column('distance_meters', Float),
     Column('duration_seconds', Float),
-    Column('rpe', Float),
-    Column('custom_metric', String)
+    Column('rpe', Float)
 )
+
+metrics = Table('metrics', metadata,
+    Column('metric_id', Integer, primary_key=True, autoincrement=True),
+    Column('metric_name', String, nullable=False, unique=True),
+    Column('units', String),
+    Column('description', String),
+    Column('category', String, nullable=False)
+)
+
 
 sleep_records_table = Table('sleep_records', metadata,
     Column('sleep_id', Integer, primary_key=True),
