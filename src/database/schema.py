@@ -56,36 +56,60 @@ metrics = Table('metrics', metadata,
 )
 
 
-sleep_records_table = Table('sleep_records', metadata,
-    Column('sleep_id', Integer, primary_key=True),
+sleep_data_table = Table('sleep_data', metadata,
+    Column('sleep_data_id', Integer, primary_key=True, autoincrement=True),
+    Column('common_data_id', Integer, ForeignKey('common_data.common_data_id'), nullable=False),
     Column('start_time', DateTime, nullable=False),
     Column('end_time', DateTime, nullable=False),
-    Column('duration_seconds', Integer),
-    Column('time_in_bed_seconds', Integer),
-    Column('sleep_stage_data', String),
-    Column('source', String),
+    Column('in_bed_duration_hours', Float),  # inBed from JSON
+    Column('sleep_duration_hours', Float), # asleep from JSON
+    Column('awake_duration_hours', Float),  # awake from JSON
+    Column('rem_sleep_duration_hours', Float),    # rem from JSON
+    Column('deep_sleep_duration_hours', Float),   # deep from JSON
+    Column('core_sleep_duration_hours', Float), # core from JSON
+    Column('in_bed_start', DateTime), 
+    Column('in_bed_end', DateTime),   
     Column('created_at', DateTime),
     Column('updated_at', DateTime)
 )
 
-nutrition_records_table = Table('nutrition_records', metadata,
-    Column('nutrition_id', Integer, primary_key=True),
-    Column('timestamp', DateTime, nullable=False),
-    Column('food_name', String),
+nutrition_data_table = Table(
+    'nutrition_data', metadata,
+    Column('nutrition_data_id', Integer, primary_key=True, autoincrement=True),
+    Column('common_data_id', Integer, ForeignKey('common_data.common_data_id'), nullable=False),
     Column('calories', Float),
     Column('protein_g', Float),
     Column('carbohydrates_g', Float),
     Column('fat_g', Float),
-    Column('meal_type', String),
-    Column('source', String),
+    Column('dietary_caffeine', Float),
+    Column('dietary_water', Float),
+    Column('fiber_g', Float),
+    Column('dietary_energy_kcal', Float),
+    Column('potassium_mg', Float),
+    Column('timestamp', DateTime, nullable=False),
     Column('created_at', DateTime),
     Column('updated_at', DateTime)
 )
 
-diet_cycles_table = Table('diet_cycles', metadata,
-    Column('cycle_id', Integer, primary_key=True),
+diet_cycles_table = Table(
+    'diet_cycles', metadata,
+    Column('cycle_id', Integer, primary_key=True, autoincrement=True),
+    Column('common_data_id', Integer, ForeignKey('common_data.common_data_id'), nullable=False),
     Column('start_date', Date, nullable=False),
-    Column('end_date', Date),  # Can be NULL if the cycle is ongoing
-    Column('cycle_type', String, nullable=False),  # 'cut' or 'bulk'
-    Column('notes', String)
+    Column('end_date', Date),
+    Column('cycle_type', String, nullable=False),
+    Column('notes', String),
+    Column('created_at', DateTime),  # Added for consistency
+    Column('updated_at', DateTime)  # Added for consistency
+)
+
+data_table = Table(
+    'data', metadata,
+    Column('data_id', Integer, primary_key=True, autoincrement=True),
+    Column('common_data_id', Integer, ForeignKey('common_data.common_data_id'), nullable=False),
+    Column('metric_id', Integer, ForeignKey('metrics.metric_id'), nullable=False),
+    Column('qty', Float, nullable=False),
+    Column('data_json', String), # to store the raw data
+    Column('created_at', DateTime),
+    Column('updated_at', DateTime)
 )
