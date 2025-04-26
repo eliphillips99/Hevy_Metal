@@ -10,7 +10,8 @@ if project_root not in sys.path:
 
 from src.database.schema import metadata
 
-DATABASE_NAME = "c:/Users/eligp/OneDrive/Documents/Coding Projects/Hevy_Metal/data/hevy_metal.db"
+# Dynamically construct the database path
+DATABASE_NAME = os.path.join(project_root, "data", "hevy_metal.db")
 
 '''Create a SQLite database with the schema defined in the schema.py file.'''
 def initialize_database():
