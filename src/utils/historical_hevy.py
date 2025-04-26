@@ -1,14 +1,14 @@
-# scripts/store_hevy_data.py
 import requests
 import os
 import sqlite3
 import json
+from datetime import datetime
 from dotenv import load_dotenv
 
 load_dotenv()
 HEVY_API_KEY = os.getenv("HEVY_API_KEY")
 BASE_URL = os.getenv("HEVY_BASE_URL")
-DATABASE_NAME = "hevy_metal.db"  # Name of our SQLite database file
+DATABASE_NAME = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../data/hevy_metal.db"))
 
 def fetch_all_hevy_workouts():
     """Fetches all workouts from the Hevy API with pagination."""
@@ -16,109 +16,31 @@ def fetch_all_hevy_workouts():
         print("Error: HEVY_API_KEY not found in environment variables.")
         return []
 
-    headers = {
-        "api-key": HEVY_API_KEY  # Correct header for API key
-    }
-
+    headers = {"api-key": HEVY_API_KEY}
     all_workouts = []
-    next_page_url = f"{BASE_URL}/workouts"  # Start with the initial endpoint
+    next_page_url = f"{BASE_URL}/workouts"
 
     while next_page_url:
-        print(f"Fetching data from: {next_page_url}")  # Log the current page URL
         try:
             response = requests.get(next_page_url, headers=headers)
             response.raise_for_status()
             data = response.json()
-
-            # Log the structure of the response for debugging
-            print(f"API response: {json.dumps(data, indent=2)[:500]}")  # Log the first 500 characters
-
-            # Correctly access the 'workouts' key in the response
             workouts = data.get("workouts", [])
-            if not isinstance(workouts, list):
-                print("Unexpected data format: 'workouts' is not a list.")
-                break
-
             all_workouts.extend(workouts)
-            print(f"Fetched {len(workouts)} workouts.")  # Log the number of workouts fetched
 
             # Handle pagination
             current_page = data.get("page")
             page_count = data.get("page_count")
-            if current_page and page_count and current_page < page_count:
-                next_page_url = f"{BASE_URL}/workouts?page={current_page + 1}"
-            else:
-                next_page_url = None
-
-            import time
-            time.sleep(0.1)  # Avoid hitting API rate limits
+            next_page_url = f"{BASE_URL}/workouts?page={current_page + 1}" if current_page < page_count else None
 
         except requests.exceptions.RequestException as e:
             print(f"Error fetching data from Hevy API: {e}")
             break
 
-    if not all_workouts:
-        print("No workouts found or an error occurred.")
-    else:
-        print(f"Finished fetching all workout data. Total workouts: {len(all_workouts)}")
-
     return all_workouts
 
-def recreate_workouts_table(cursor):
-    """Recreates the workouts table with the updated schema."""
-    # Check if the workouts table exists
-    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='workouts'")
-    table_exists = cursor.fetchone()
-
-    if table_exists:
-        # Rename the existing table
-        cursor.execute("ALTER TABLE workouts RENAME TO old_workouts")
-
-        # Create the new table with the updated schema
-        cursor.execute("""
-        CREATE TABLE workouts (
-            workout_id TEXT PRIMARY KEY,
-            title TEXT,
-            description TEXT,
-            start_time TEXT,
-            end_time TEXT,
-            workout_date TEXT,  -- Add this column
-            routine_title TEXT,
-            created_at TEXT,
-            updated_at TEXT
-        )
-        """)
-
-        # Copy data from the old table to the new table
-        cursor.execute("""
-        INSERT INTO workouts (workout_id, title, description, start_time, end_time, workout_date, routine_title, created_at, updated_at)
-        SELECT workout_id, title, description, start_time, end_time, 
-               substr(start_time, 1, 10) AS workout_date,  -- Extract date from start_time
-               routine_title, created_at, updated_at
-        FROM old_workouts
-        """)
-
-        # Drop the old table
-        cursor.execute("DROP TABLE old_workouts")
-    else:
-        print("The workouts table does not exist. Creating a new table...")
-        # Create the new table with the updated schema
-        cursor.execute("""
-        CREATE TABLE workouts (
-            workout_id TEXT PRIMARY KEY,
-            title TEXT,
-            description TEXT,
-            start_time TEXT,
-            end_time TEXT,
-            workout_date TEXT,  -- Add this column
-            routine_title TEXT,
-            created_at TEXT,
-            updated_at TEXT
-        )
-        """)
-
-def store_workouts_in_sqlite(workouts, rebuild=False):
-    """Stores Hevy workout data in a SQLite database with relational tables."""
+def store_workouts_in_sqlite(workouts):
+    """Stores Hevy workout data in the SQLite database using the updated schema."""
     if not workouts:
         print("No workouts to store in the database.")
         return
@@ -126,135 +48,99 @@ def store_workouts_in_sqlite(workouts, rebuild=False):
     conn = sqlite3.connect(DATABASE_NAME)
     cursor = conn.cursor()
 
-    # Rebuild the workouts table if requested
-    if rebuild:
-        print("Rebuilding the workouts table...")
-        cursor.execute("DROP TABLE IF EXISTS workouts")
-        recreate_workouts_table(cursor)
-
-    # Check if the workouts table exists and has the workout_date column
-    cursor.execute("PRAGMA table_info(workouts)")
-    columns = [col[1] for col in cursor.fetchall()]
-    if "workout_date" not in columns:
-        print("Recreating the workouts table to add the workout_date column...")
-        recreate_workouts_table(cursor)
-
-    # Create exercises table
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS exercises (
-        exercise_id INTEGER PRIMARY KEY AUTOINCREMENT,
-        hevy_exercise_template_id TEXT UNIQUE NOT NULL,
-        exercise_name TEXT NOT NULL
-    )
-    """)
-    conn.commit()
-
-    # Create workout_exercises junction table
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS workout_exercises (
-        workout_exercise_id INTEGER PRIMARY KEY AUTOINCREMENT,
-        workout_id TEXT NOT NULL,
-        exercise_id INTEGER NOT NULL,
-        exercise_index INTEGER NOT NULL,
-        exercise_notes TEXT,
-        superset_id INTEGER,
-        FOREIGN KEY (workout_id) REFERENCES workouts(workout_id),
-        FOREIGN KEY (exercise_id) REFERENCES exercises(exercise_id)
-    )
-    """)
-    conn.commit()
-
-    # Create sets table
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS sets (
-        set_id INTEGER PRIMARY KEY AUTOINCREMENT,
-        workout_exercise_id INTEGER NOT NULL,
-        set_index INTEGER NOT NULL,
-        set_type TEXT,
-        weight_kg REAL,
-        reps INTEGER,
-        distance_meters REAL,
-        duration_seconds REAL,
-        rpe REAL,
-        custom_metric TEXT,
-        FOREIGN KEY (workout_exercise_id) REFERENCES workout_exercises(workout_exercise_id)
-    )
-    """)
-    conn.commit()
-
     for workout in workouts:
         if not isinstance(workout, dict):
             print(f"Skipping invalid workout data: {workout}")
             continue
 
+        # Insert into common_data
+        common_data_id = None
+        try:
+            cursor.execute("""
+                INSERT INTO common_data (date, source)
+                VALUES (?, ?)
+            """, (workout.get("start_time"), "Hevy API"))
+            common_data_id = cursor.lastrowid
+        except sqlite3.IntegrityError:
+            print("Error inserting into common_data.")
+            continue
+
+        # Insert into workouts
         workout_id = workout.get("id")
-        title = workout.get("title")
-        description = workout.get("description")
+        workout_name = workout.get("title")
+        workout_description = workout.get("description")
         start_time = workout.get("start_time")
         end_time = workout.get("end_time")
-        workout_date = start_time.split("T")[0] if start_time else None  # Extract date from start_time
+        duration = workout.get("duration")
+        routine_title = workout.get("routine_title")
         created_at = workout.get("created_at")
         updated_at = workout.get("updated_at")
-        routine_title = workout.get("title")  # Assuming title often is routine name
 
         try:
             cursor.execute("""
-            INSERT OR IGNORE INTO workouts (workout_id, title, description, start_time, end_time, workout_date, routine_title, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (workout_id, title, description, start_time, end_time, workout_date, routine_title, created_at, updated_at))
+                INSERT INTO workouts (common_data_id, workout_id, workout_name, workout_description, start_time, end_time, duration, routine_title, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (common_data_id, workout_id, workout_name, workout_description, start_time, end_time, duration, routine_title, created_at, updated_at))
         except sqlite3.IntegrityError:
-            pass
+            print(f"Error inserting workout {workout_id}.")
+            continue
 
+        # Insert exercises and workout_exercises
         for exercise_data in workout.get("exercises", []):
-            if not isinstance(exercise_data, dict):
-                print(f"Skipping invalid exercise data: {exercise_data}")
-                continue
-
             hevy_exercise_template_id = exercise_data.get("exercise_template_id")
             exercise_name = exercise_data.get("title")
             exercise_index = exercise_data.get("index")
             exercise_notes = exercise_data.get("notes")
             superset_id = exercise_data.get("superset_id")
 
-            cursor.execute("""
-            INSERT OR IGNORE INTO exercises (hevy_exercise_template_id, exercise_name)
-            VALUES (?, ?)
-            """, (hevy_exercise_template_id, exercise_name))
-            cursor.execute("SELECT exercise_id FROM exercises WHERE hevy_exercise_template_id = ?", (hevy_exercise_template_id,))
-            exercise_record = cursor.fetchone()
-            if exercise_record:
-                exercise_id = exercise_record[0]
-
+            # Insert into exercises
+            exercise_id = None
+            try:
                 cursor.execute("""
-                INSERT INTO workout_exercises (workout_id, exercise_id, exercise_index, exercise_notes, superset_id)
-                VALUES (?, ?, ?, ?, ?)
+                    INSERT OR IGNORE INTO exercises (hevy_exercise_template_id, exercise_name)
+                    VALUES (?, ?)
+                """, (hevy_exercise_template_id, exercise_name))
+                cursor.execute("SELECT exercise_id FROM exercises WHERE hevy_exercise_template_id = ?", (hevy_exercise_template_id,))
+                exercise_id = cursor.fetchone()[0]
+            except sqlite3.IntegrityError:
+                print(f"Error inserting exercise {exercise_name}.")
+                continue
+
+            # Insert into workout_exercises
+            try:
+                cursor.execute("""
+                    INSERT INTO workout_exercises (workout_id, exercise_id, exercise_index, exercise_notes, superset_id)
+                    VALUES (?, ?, ?, ?, ?)
                 """, (workout_id, exercise_id, exercise_index, exercise_notes, superset_id))
-                workout_exercise_id = cursor.lastrowid
+            except sqlite3.IntegrityError:
+                print(f"Error inserting workout_exercise for workout {workout_id}.")
+                continue
 
-                for set_info in exercise_data.get("sets", []):
-                    if not isinstance(set_info, dict):
-                        print(f"Skipping invalid set data: {set_info}")
-                        continue
+            # Insert sets
+            for set_data in exercise_data.get("sets", []):
+                set_index = set_data.get("index")
+                set_type = set_data.get("type")
+                weight_kg = set_data.get("weight_kg")
+                reps = set_data.get("reps")
+                duration_seconds = set_data.get("duration_seconds")
+                rpe = set_data.get("rpe")
+                custom_metric = set_data.get("custom_metric")
 
-                    set_index = set_info.get("index")
-                    set_type = set_info.get("type")
-                    weight_kg = set_info.get("weight_kg")
-                    reps = set_info.get("reps")
-                    distance_meters = set_info.get("distance_meters")
-                    duration_seconds = set_info.get("duration_seconds")
-                    rpe = set_info.get("rpe")
-                    custom_metric = set_info.get("custom_metric")
-
+                try:
                     cursor.execute("""
-                    INSERT INTO sets (workout_exercise_id, set_index, set_type, weight_kg, reps, distance_meters, duration_seconds, rpe, custom_metric)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """, (workout_exercise_id, set_index, set_type, weight_kg, reps, distance_meters, duration_seconds, rpe, custom_metric))
+                        INSERT INTO sets (exercise_id, set_index, set_type, weight_kg, reps, duration_seconds, rpe, custom_metric)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """, (exercise_id, set_index, set_type, weight_kg, reps, duration_seconds, rpe, custom_metric))
+                except sqlite3.IntegrityError:
+                    print(f"Error inserting set for exercise {exercise_name}.")
+                    continue
 
     conn.commit()
     conn.close()
-    print(f"Successfully stored {len(workouts)} workouts in {DATABASE_NAME}")
+    print(f"Successfully stored {len(workouts)} workouts in {DATABASE_NAME}.")
 
-def main(rebuild=False):
+
+def main():
     # Fetch all workouts from Hevy API
     workouts = fetch_all_hevy_workouts()
     if not workouts:
@@ -262,11 +148,8 @@ def main(rebuild=False):
         return
 
     # Store the fetched workouts in SQLite database
-    store_workouts_in_sqlite(workouts, rebuild=rebuild)
+    store_workouts_in_sqlite(workouts)
     print(f"Stored {len(workouts)} workouts in the database.")
 
 if __name__ == "__main__":
-    print("Starting the Hevy data fetch and store process...")  # Log script start
-    rebuild = input("Do you want to rebuild the workouts table? (yes/no): ").strip().lower() == "yes"
-    main(rebuild=rebuild)
-    print("Process completed.")  # Log script completion
+    main()
