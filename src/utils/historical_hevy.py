@@ -41,6 +41,7 @@ def fetch_all_hevy_workouts():
 
 def store_workouts_in_sqlite(workouts):
     """Stores Hevy workout data in the SQLite database using the updated schema."""
+    
     if not workouts:
         print("No workouts to store in the database.")
         return
@@ -66,26 +67,28 @@ def store_workouts_in_sqlite(workouts):
             continue
 
         # Insert into workouts
-        workout_id = workout.get("id")
+        hevy_workout_id = workout.get("id")
         workout_name = workout.get("title")
         workout_description = workout.get("description")
-        start_time = workout.get("start_time")
-        end_time = workout.get("end_time")
+        start_time = datetime.fromisoformat(workout.get("start_time")) if workout.get("start_time") else None
+        end_time = datetime.fromisoformat(workout.get("end_time")) if workout.get("end_time") else None
         duration = workout.get("duration")
         routine_title = workout.get("routine_title")
-        created_at = workout.get("created_at")
-        updated_at = workout.get("updated_at")
+        created_at = datetime.fromisoformat(workout.get("created_at").replace("Z", "+00:00")) if workout.get("created_at") else None
+        updated_at = datetime.fromisoformat(workout.get("updated_at").replace("Z", "+00:00")) if workout.get("updated_at") else None
+
+        print(f"Inserting workout: {hevy_workout_id}, {workout_name}, {start_time}, {end_time}, {duration}")
 
         try:
             cursor.execute("""
-                INSERT INTO workouts (common_data_id, workout_id, workout_name, workout_description, start_time, end_time, duration, routine_title, created_at, updated_at)
+                INSERT INTO workouts (common_data_id, hevy_workout_id, workout_name, workout_description, start_time, end_time, duration, routine_title, created_at, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (common_data_id, workout_id, workout_name, workout_description, start_time, end_time, duration, routine_title, created_at, updated_at))
+            """, (common_data_id, hevy_workout_id, workout_name, workout_description, start_time, end_time, duration, routine_title, created_at, updated_at))
         except sqlite3.IntegrityError as e:
-            print(f"Error inserting workout {workout_id}: {e}")
+            print(f"Error inserting workout {hevy_workout_id}: {e}")
             continue
         except sqlite3.OperationalError as e:
-            print(f"OperationalError for workout {workout_id}: {e}")
+            print(f"Operational error inserting workout {hevy_workout_id}: {e}")
             continue
 
         # Insert exercises and workout_exercises
@@ -114,9 +117,9 @@ def store_workouts_in_sqlite(workouts):
                 cursor.execute("""
                     INSERT INTO workout_exercises (workout_id, exercise_id, exercise_index, exercise_notes, superset_id)
                     VALUES (?, ?, ?, ?, ?)
-                """, (workout_id, exercise_id, exercise_index, exercise_notes, superset_id))
+                """, (hevy_workout_id, exercise_id, exercise_index, exercise_notes, superset_id))
             except sqlite3.IntegrityError:
-                print(f"Error inserting workout_exercise for workout {workout_id}.")
+                print(f"Error inserting workout_exercise for workout {hevy_workout_id}.")
                 continue
 
             # Insert sets

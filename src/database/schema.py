@@ -12,6 +12,7 @@ common_data = Table('common_data', metadata,
 workouts_table = Table('workouts', metadata,
     Column('common_data_id', Integer, ForeignKey('common_data.common_data_id'), nullable=False),
     Column('workout_id', Integer, primary_key=True, autoincrement=True),
+    Column('hevy_workout_id', String, unique=True, nullable=False),
     Column('workout_name', String),
     Column('workout_description', String),
     Column('start_time', DateTime),
@@ -44,7 +45,8 @@ sets_table = Table('sets', metadata,
     Column('weight_kg', Float),
     Column('reps', Integer),
     Column('duration_seconds', Float),
-    Column('rpe', Float)
+    Column('rpe', Float),
+    Column('custom_metric', String),
 )
 
 metrics = Table('metrics', metadata,
