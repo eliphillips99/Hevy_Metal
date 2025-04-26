@@ -1,5 +1,14 @@
 import os
 from sqlalchemy import create_engine
+import sys
+import os
+
+# Dynamically add the project root to sys.path
+current_dir = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.abspath(os.path.join(current_dir, "../../"))
+if project_root not in sys.path:
+    sys.path.append(project_root)
+
 from src.utils.historical_hevy import main as populate_hevy_data
 from src.utils.historical_health import import_historical_data
 from src.database.schema import metadata

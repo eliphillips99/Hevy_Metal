@@ -75,6 +75,7 @@ def insert_raw_data(cursor, metric_name, metric_units, metric_data):
             """, (common_data_id, metric_id, qty, json.dumps(entry), 
                     datetime.now().strftime("%Y-%m-%d %H:%M:%S"), 
                     datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+            
         except sqlite3.IntegrityError as e:
             print(f"Error inserting data for metric '{metric_name}': {e}")   
 
@@ -144,16 +145,34 @@ def pull_nutrition_from_json(metric_data, metric_name, cursor, nutrition_data_gr
                 # Group nutrition data by date and source
                 key = (date, source)
                 if key not in nutrition_data_grouped:
-                    nutrition_data_grouped[key] = {"calories": None, "protein": None, "carbohydrates": None, "fat": None}
+                    nutrition_data_grouped[key] = {
+                        "dietary_energy": None,
+                        "protein": None,
+                        "carbohydrates": None,
+                        "fat": None,
+                        "dietary_water": None,
+                        "dietary_caffeine": None,
+                        "potassium": None,
+                        "fiber": None,
+                        "sodium": None,
+                        "dietary_sugar": None
+                    }
                 nutrition_data_grouped[key][metric_name] = qty
         
      for (date, source), nutrition_values in nutrition_data_grouped.items():
-        calories = nutrition_values.get("calories")
+        calories = nutrition_values.get("dietary_energy")
         protein_g = nutrition_values.get("protein")
         carbohydrates_g = nutrition_values.get("carbohydrates")
         fat_g = nutrition_values.get("fat")
+        water_floz = nutrition_values.get("dietary_water")
+        caffeine_mg = nutrition_values.get("dietary_caffeine")
+        potassium_mg = nutrition_values.get("potassium")
+        fiber_g = nutrition_values.get("fiber")
+        sodium_mg = nutrition_values.get("sodium")
+        sugar_g = nutrition_values.get("dietary_sugar")
 
-        print(f"Processing grouped nutrition entry: Date: {date}, Calories: {calories}, Protein: {protein_g}, Carbs: {carbohydrates_g}, Fat: {fat_g}, Source: {source}")
+
+        print(f"Processing grouped nutrition entry: Date: {date}, Calories: {calories}, Protein: {protein_g}, Source: {source}")
 
         # Convert date to a datetime object
         try:
@@ -168,14 +187,77 @@ def pull_nutrition_from_json(metric_data, metric_name, cursor, nutrition_data_gr
         # Insert into the nutrition_data table
         try:
             cursor.execute("""
-                INSERT INTO nutrition_data (common_data_id, calories, protein_g, carbohydrates_g, fat_g, created_at, updated_at)
+                INSERT INTO nutrition_data (common_data_id, calories, protein_g, carbohydrates_g, fat_g, water_floz, caffeine_mg, 
+                           potassium_mg, fiber_g, sodium_mg, sugar_g, created_at, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (common_data_id, calories, protein_g, carbohydrates_g, fat_g, 
+            """, (common_data_id, calories, protein_g, carbohydrates_g, fat_g, water_floz, caffeine_mg,
+                  potassium_mg, fiber_g, sodium_mg, sugar_g,
                   datetime.now().strftime("%Y-%m-%d %H:%M:%S"), 
                   datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
-            print(f"Inserted grouped nutrition entry: Date: {date}, Calories: {calories}")
+            
         except sqlite3.IntegrityError as e:
             print(f"Error inserting grouped nutrition data: {e}")   
+
+def pull_markers_from_json(metric_data, metric_name, cursor, markers_data_grouped):
+     for entry in metric_data:
+                date = entry.get("date")
+                qty = entry.get("qty")
+                source = entry.get("source", "Unknown")
+
+                # Group nutrition data by date and source
+                key = (date, source)
+                if key not in markers_data_grouped:
+                    markers_data_grouped[key] = {
+                        "time_in_daylight": None,
+                        "vo2_max": None,
+                        "heart_rate": None,
+                        "heart_rate_variability": None,
+                        "resting_heart_rate": None,
+                        "respitory_rate": None,
+                        "blood_oxygen_saturation": None,
+                        "body_weight_lbs": None,
+                        "body_mass_index": None,
+                    }
+                markers_data_grouped[key][metric_name] = qty
+        
+     for (date, source), marker_values in markers_data_grouped.items():
+        time_in_daylight = marker_values.get("time_in_daylight")
+        vo2_max = marker_values.get("vo2_max")
+        heart_rate = marker_values.get("heart_rate")
+        heart_rate_variability = marker_values.get("heart_rate_variability")
+        resting_heart_rate = marker_values.get("resting_heart_rate")
+        respiratory_rate = marker_values.get("respiratory_rate")
+        blood_oxygen_saturation = marker_values.get("blood_oxygen_saturation")
+        body_weight_lbs = marker_values.get("body_weight_lbs")
+        body_mass_index = marker_values.get("body_mass_index")
+
+
+        print(f"Processing grouped nutrition entry: Date: {date}, Body Weight: {body_weight_lbs}")
+
+        # Convert date to a datetime object
+        try:
+            timestamp = datetime.strptime(date, "%Y-%m-%d %H:%M:%S %z")
+        except ValueError as e:
+            print(f"Error parsing marker date '{date}': {e}")
+            continue
+
+        # Get or create the common_data_id
+        common_data_id = get_or_create_common_data_id(cursor, timestamp, source)
+
+        # Insert into the nutrition_data table
+        try:
+            cursor.execute("""
+                INSERT INTO nutrition_data (common_data_id, time_in_daylight, vo2_max, heart_rate, heart_rate_variability,
+                           resting_heart_rate, respiratory_rate, blood_oxygen_saturation, body_mass_index, body_weight_lbs, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (common_data_id, time_in_daylight, vo2_max, heart_rate, heart_rate_variability, resting_heart_rate, respiratory_rate, blood_oxygen_saturation,
+                  body_mass_index, body_weight_lbs,
+                  datetime.now().strftime("%Y-%m-%d %H:%M:%S"), 
+                  datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+
+        except sqlite3.IntegrityError as e:
+            print(f"Error inserting grouped nutrition data: {e}")   
+
 
 def import_daily_data(data, conn):
     """
@@ -183,9 +265,12 @@ def import_daily_data(data, conn):
     """
     cursor = conn.cursor()
 
-    nutrition_metrics = ["protein", "dietary_energy", "dietary_caffeine", "dietary_water", "fiber", "potassium", "carbohydrates", "body_mass_index", "weight_body_mass"]
-
+    nutrition_metrics = ["protein", "dietary_energy", "dietary_caffeine", "dietary_water", "sodium", "fiber", "potassium", "carbohydrates", "sugar", "fat"]
     nutrition_data_grouped = {}
+
+    markers_metrics = ["time_in_daylight", "vo2_max", "heart_rate", "heart_rate_variability", "resting_heart_rate", "respiratory_rate", "blood_oxygen_saturation", "body_weight_lbs", "body_mass_index"]    
+    markers_data_grouped = {}
+
     # Import metrics data
     for metric in data.get("metrics", []):
         metric_name = metric.get("name")
@@ -199,39 +284,8 @@ def import_daily_data(data, conn):
         elif metric_name in nutrition_metrics:
             pull_nutrition_from_json(metric_data, metric_name, cursor, nutrition_data_grouped)
 
-
-    # Import nutrition data
-    for nutrition_entry in data.get("nutrition_data_table", []):
-        date = nutrition_entry.get("date")
-        calories = nutrition_entry.get("calories")
-        protein_g = nutrition_entry.get("protein_g")
-        carbohydrates_g = nutrition_entry.get("carbohydrates_g")
-        fat_g = nutrition_entry.get("fat_g")
-        source = nutrition_entry.get("source", "Unknown")
-
-        print(f"Processing nutrition entry: Date: {date}, Calories: {calories}, Protein: {protein_g}, Carbs: {carbohydrates_g}, Fat: {fat_g}, Source: {source}")
-
-        # Convert date to a datetime object
-        try:
-            timestamp = datetime.strptime(date, "%Y-%m-%d %H:%M:%S %z")
-        except ValueError as e:
-            print(f"Error parsing nutrition date '{date}': {e}")
-            continue
-
-        # Get or create the common_data_id
-        common_data_id = get_or_create_common_data_id(cursor, timestamp, source)
-
-        # Insert into the nutrition_data table
-        try:
-            cursor.execute("""
-                INSERT INTO nutrition_data (common_data_id, calories, protein_g, carbohydrates_g, fat_g, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (common_data_id, calories, protein_g, carbohydrates_g, fat_g, 
-                  datetime.now().strftime("%Y-%m-%d %H:%M:%S"), 
-                  datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
-            print(f"Inserted nutrition entry: Date: {date}, Calories: {calories}")
-        except sqlite3.IntegrityError as e:
-            print(f"Error inserting nutrition data: {e}")
+        elif metric_name in markers_metrics:
+            pull_markers_from_json(metric_data, metric_name, cursor, markers_data_grouped)
 
     # Commit the changes
     conn.commit()

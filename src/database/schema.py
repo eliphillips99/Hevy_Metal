@@ -81,11 +81,12 @@ nutrition_data_table = Table(
     Column('protein_g', Float),
     Column('carbohydrates_g', Float),
     Column('fat_g', Float),
-    Column('dietary_caffeine', Float),
-    Column('dietary_water', Float),
+    Column('caffeine_mg', Float),
+    Column('water_floz', Float),
     Column('fiber_g', Float),
-    Column('dietary_energy_kcal', Float),
     Column('potassium_mg', Float),
+    Column('sodium_mg', Float),
+    Column('sugar_g', Float),
     Column('timestamp', DateTime, nullable=False),
     Column('created_at', DateTime),
     Column('updated_at', DateTime)
@@ -101,6 +102,23 @@ diet_cycles_table = Table(
     Column('notes', String),
     Column('created_at', DateTime),  # Added for consistency
     Column('updated_at', DateTime)  # Added for consistency
+)
+
+health_markers_table = Table(
+    'health_markers', metadata,
+    Column('health_marker_id', Integer, primary_key=True, autoincrement=True),
+    Column('common_data_id', Integer, ForeignKey('common_data.common_data_id'), nullable=False),
+    Column('time_in_daylight_hours', Float),
+    Column('vo2_max', Float),
+    Column('heart_rate', Float),
+    Column('heart_rate_variability', Float),
+    Column('resting_heart_rate', Float),
+    Column('respiratory_rate', Float),
+    Column('blood_oxygen_saturation', Float),
+    Column('body_weight_lbs', Float),
+    Column('body_mass_index', Float),
+    Column('created_at', DateTime),
+    Column('updated_at', DateTime)
 )
 
 data_table = Table(
