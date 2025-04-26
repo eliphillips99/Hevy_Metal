@@ -75,7 +75,7 @@ def store_workouts_in_sqlite(workouts):
         created_at = datetime.fromisoformat(workout.get("created_at").replace("Z", "+00:00")) if workout.get("created_at") else None
         updated_at = datetime.fromisoformat(workout.get("updated_at").replace("Z", "+00:00")) if workout.get("updated_at") else None
 
-        print(f"Inserting workout: {hevy_workout_id}, {workout_name}, {start_time}, {end_time}, {duration}")
+        print(f"Inserting workout: {hevy_workout_id}, {workout_name}, {start_time}, {end_time}")
 
         try:
             cursor.execute("""
