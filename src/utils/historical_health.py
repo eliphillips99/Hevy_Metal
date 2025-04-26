@@ -2,6 +2,7 @@ import os
 import json
 import sqlite3
 from datetime import datetime
+from datetime import date
 
 DATABASE_NAME = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../data/hevy_metal.db"))
 JSON_FILE_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../data/HealthAutoExport-2023-06-17-2025-04-26.json"))
@@ -292,10 +293,11 @@ def import_daily_data(data, conn):
     # Commit the changes
     conn.commit()
 
-def import_historical_data(json_file_path):
+def import_historical_data(json_file_path, target_date=None):
     """
-    Loops through the JSON file and imports all historical data into the database.
+    Loops through the JSON file and imports all historical data or data for a specific date into the database.
     :param json_file_path: Path to the JSON file containing historical data.
+    :param target_date: Optional. A datetime.date object to filter data for a specific day.
     """
     if not os.path.exists(json_file_path):
         print(f"JSON file not found: {json_file_path}")
@@ -305,19 +307,37 @@ def import_historical_data(json_file_path):
     with open(json_file_path, "r") as file:
         health_data = json.load(file)
 
+    # Filter data for the target date if provided
+    if target_date:
+        filtered_data = {
+            "metrics": [
+                {
+                    "name": metric["name"],
+                    "units": metric["units"],
+                    "data": [
+                        entry for entry in metric["data"]
+                        if datetime.strptime(entry["date"], "%Y-%m-%d %H:%M:%S %z").date() == target_date
+                    ],
+                }
+                for metric in health_data["data"]["metrics"]
+            ]
+        }
+        health_data["data"] = filtered_data
+
     # Connect to the database
     conn = sqlite3.connect(DATABASE_NAME)
 
     # Import the data
-    print("Importing historical health data...")
+    print(f"Importing health data for {target_date if target_date else 'all dates'}...")
     import_daily_data(health_data["data"], conn)
 
     # Close the connection
     conn.close()
-    print("Historical data import complete.")
+    print("Data import complete.")
 
 if __name__ == "__main__":
     # Import historical data
-    import_historical_data(JSON_FILE_PATH)
+    target_date = date(2024, 4, 25)  # Set to a specific date if needed
+    import_historical_data(JSON_FILE_PATH, target_date)
 
 
