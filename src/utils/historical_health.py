@@ -137,29 +137,29 @@ def pull_sleep_from_json(metric_data, cursor):
                     print(f"Error inserting sleep cycle data: {e}")
 
 def pull_nutrition_from_json(metric_data, metric_name, cursor, nutrition_data_grouped):
-     for entry in metric_data:
-                date = entry.get("date")
-                qty = entry.get("qty")
-                source = entry.get("source", "Unknown")
+    for entry in metric_data:
+        date = entry.get("date")
+        qty = entry.get("qty")
+        source = entry.get("source", "Unknown")
 
-                # Group nutrition data by date and source
-                key = (date, source)
-                if key not in nutrition_data_grouped:
-                    nutrition_data_grouped[key] = {
-                        "dietary_energy": None,
-                        "protein": None,
-                        "carbohydrates": None,
-                        "fat": None,
-                        "dietary_water": None,
-                        "dietary_caffeine": None,
-                        "potassium": None,
-                        "fiber": None,
-                        "sodium": None,
-                        "dietary_sugar": None
-                    }
-                nutrition_data_grouped[key][metric_name] = qty
-        
-     for (date, source), nutrition_values in nutrition_data_grouped.items():
+        # Group nutrition data by date and source
+        key = (date, source)
+        if key not in nutrition_data_grouped:
+            nutrition_data_grouped[key] = {
+                "dietary_energy": None,
+                "protein": None,
+                "carbohydrates": None,
+                "fat": None,
+                "dietary_water": None,
+                "dietary_caffeine": None,
+                "potassium": None,
+                "fiber": None,
+                "sodium": None,
+                "dietary_sugar": None
+            }
+        nutrition_data_grouped[key][metric_name] = qty
+
+    for (date, source), nutrition_values in nutrition_data_grouped.items():
         calories = nutrition_values.get("dietary_energy")
         protein_g = nutrition_values.get("protein")
         carbohydrates_g = nutrition_values.get("carbohydrates")
@@ -170,7 +170,6 @@ def pull_nutrition_from_json(metric_data, metric_name, cursor, nutrition_data_gr
         fiber_g = nutrition_values.get("fiber")
         sodium_mg = nutrition_values.get("sodium")
         sugar_g = nutrition_values.get("dietary_sugar")
-
 
         print(f"Processing grouped nutrition entry: Date: {date}, Calories: {calories}, Protein: {protein_g}, Source: {source}")
 
@@ -187,16 +186,19 @@ def pull_nutrition_from_json(metric_data, metric_name, cursor, nutrition_data_gr
         # Insert into the nutrition_data table
         try:
             cursor.execute("""
-                INSERT INTO nutrition_data (common_data_id, calories, protein_g, carbohydrates_g, fat_g, water_floz, caffeine_mg, 
-                           potassium_mg, fiber_g, sodium_mg, sugar_g, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (common_data_id, calories, protein_g, carbohydrates_g, fat_g, water_floz, caffeine_mg,
-                  potassium_mg, fiber_g, sodium_mg, sugar_g,
-                  datetime.now().strftime("%Y-%m-%d %H:%M:%S"), 
-                  datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
-            
+                INSERT INTO nutrition_data (
+                    common_data_id, calories, protein_g, carbohydrates_g, fat_g, water_floz, caffeine_mg,
+                    potassium_mg, fiber_g, sodium_mg, sugar_g, created_at, updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                common_data_id, calories, protein_g, carbohydrates_g, fat_g, water_floz, caffeine_mg,
+                potassium_mg, fiber_g, sodium_mg, sugar_g,
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            ))
         except sqlite3.IntegrityError as e:
-            print(f"Error inserting grouped nutrition data: {e}")   
+            print(f"Error inserting grouped nutrition data: {e}")
 
 def pull_markers_from_json(metric_data, metric_name, cursor, markers_data_grouped):
      for entry in metric_data:
@@ -247,9 +249,9 @@ def pull_markers_from_json(metric_data, metric_name, cursor, markers_data_groupe
         # Insert into the nutrition_data table
         try:
             cursor.execute("""
-                INSERT INTO nutrition_data (common_data_id, time_in_daylight, vo2_max, heart_rate, heart_rate_variability,
+                INSERT INTO health_markers (common_data_id, time_in_daylight_hours, vo2_max, heart_rate, heart_rate_variability,
                            resting_heart_rate, respiratory_rate, blood_oxygen_saturation, body_mass_index, body_weight_lbs, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (common_data_id, time_in_daylight, vo2_max, heart_rate, heart_rate_variability, resting_heart_rate, respiratory_rate, blood_oxygen_saturation,
                   body_mass_index, body_weight_lbs,
                   datetime.now().strftime("%Y-%m-%d %H:%M:%S"), 

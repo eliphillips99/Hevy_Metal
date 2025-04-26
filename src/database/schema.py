@@ -87,7 +87,7 @@ nutrition_data_table = Table(
     Column('potassium_mg', Float),
     Column('sodium_mg', Float),
     Column('sugar_g', Float),
-    Column('timestamp', DateTime, nullable=False),
+    Column('timestamp', DateTime),
     Column('created_at', DateTime),
     Column('updated_at', DateTime)
 )
