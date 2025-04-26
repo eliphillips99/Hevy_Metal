@@ -81,8 +81,11 @@ def store_workouts_in_sqlite(workouts):
                 INSERT INTO workouts (common_data_id, workout_id, workout_name, workout_description, start_time, end_time, duration, routine_title, created_at, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (common_data_id, workout_id, workout_name, workout_description, start_time, end_time, duration, routine_title, created_at, updated_at))
-        except sqlite3.IntegrityError:
-            print(f"Error inserting workout {workout_id}.")
+        except sqlite3.IntegrityError as e:
+            print(f"Error inserting workout {workout_id}: {e}")
+            continue
+        except sqlite3.OperationalError as e:
+            print(f"OperationalError for workout {workout_id}: {e}")
             continue
 
         # Insert exercises and workout_exercises
