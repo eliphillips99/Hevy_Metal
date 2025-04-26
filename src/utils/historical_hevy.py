@@ -72,8 +72,6 @@ def store_workouts_in_sqlite(workouts):
         workout_description = workout.get("description")
         start_time = datetime.fromisoformat(workout.get("start_time")) if workout.get("start_time") else None
         end_time = datetime.fromisoformat(workout.get("end_time")) if workout.get("end_time") else None
-        duration = workout.get("duration")
-        routine_title = workout.get("routine_title")
         created_at = datetime.fromisoformat(workout.get("created_at").replace("Z", "+00:00")) if workout.get("created_at") else None
         updated_at = datetime.fromisoformat(workout.get("updated_at").replace("Z", "+00:00")) if workout.get("updated_at") else None
 
@@ -81,9 +79,9 @@ def store_workouts_in_sqlite(workouts):
 
         try:
             cursor.execute("""
-                INSERT INTO workouts (common_data_id, hevy_workout_id, workout_name, workout_description, start_time, end_time, duration, routine_title, created_at, updated_at)
+                INSERT INTO workouts (common_data_id, hevy_workout_id, workout_name, workout_description, start_time, end_time, created_at, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (common_data_id, hevy_workout_id, workout_name, workout_description, start_time, end_time, duration, routine_title, created_at, updated_at))
+            """, (common_data_id, hevy_workout_id, workout_name, workout_description, start_time, end_time, created_at, updated_at))
         except sqlite3.IntegrityError as e:
             print(f"Error inserting workout {hevy_workout_id}: {e}")
             continue

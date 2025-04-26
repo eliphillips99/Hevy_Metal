@@ -4,7 +4,7 @@ import sqlite3
 from datetime import datetime
 
 DATABASE_NAME = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../data/hevy_metal.db"))
-JSON_FILE_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../data/HealthAutoExport-2023-06-17-2025-04-23.json"))
+JSON_FILE_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../data/HealthAutoExport-2023-06-17-2025-04-26.json"))
 
 def get_or_create_common_data_id(cursor, date, source):
     """
@@ -50,7 +50,7 @@ def import_daily_data(data, conn):
     """
     cursor = conn.cursor()
 
-    # Loop through each metric in the data
+    # Import metrics data
     for metric in data.get("metrics", []):
         metric_name = metric.get("name")
         metric_units = metric.get("units")
@@ -83,6 +83,61 @@ def import_daily_data(data, conn):
                 """, (common_data_id, metric_id, qty, json.dumps(entry), datetime.now(), datetime.now()))
             except sqlite3.IntegrityError as e:
                 print(f"Error inserting data for metric '{metric_name}': {e}")
+
+    # Import sleep cycle data
+    for sleep_entry in data.get("sleep_cycles", []):
+        start_time = sleep_entry.get("start_time")
+        end_time = sleep_entry.get("end_time")
+        sleep_type = sleep_entry.get("type")
+        source = sleep_entry.get("source", "Unknown")
+
+        # Convert times to datetime objects
+        try:
+            start_timestamp = datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S %z")
+            end_timestamp = datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S %z")
+        except ValueError as e:
+            print(f"Error parsing sleep cycle times: {e}")
+            continue
+
+        # Get or create the common_data_id
+        common_data_id = get_or_create_common_data_id(cursor, start_timestamp, source)
+
+        # Insert into the sleep_records table
+        try:
+            cursor.execute("""
+                INSERT INTO sleep_records (common_data_id, start_time, end_time, sleep_type, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (common_data_id, start_timestamp, end_timestamp, sleep_type, datetime.now(), datetime.now()))
+        except sqlite3.IntegrityError as e:
+            print(f"Error inserting sleep cycle data: {e}")
+
+    # Import nutrition data
+    for nutrition_entry in data.get("nutrition", []):
+        date = nutrition_entry.get("date")
+        calories = nutrition_entry.get("calories")
+        protein_g = nutrition_entry.get("protein_g")
+        carbohydrates_g = nutrition_entry.get("carbohydrates_g")
+        fat_g = nutrition_entry.get("fat_g")
+        source = nutrition_entry.get("source", "Unknown")
+
+        # Convert date to a datetime object
+        try:
+            timestamp = datetime.strptime(date, "%Y-%m-%d %H:%M:%S %z")
+        except ValueError as e:
+            print(f"Error parsing nutrition date '{date}': {e}")
+            continue
+
+        # Get or create the common_data_id
+        common_data_id = get_or_create_common_data_id(cursor, timestamp, source)
+
+        # Insert into the nutrition_data table
+        try:
+            cursor.execute("""
+                INSERT INTO nutrition_data (common_data_id, calories, protein_g, carbohydrates_g, fat_g, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (common_data_id, calories, protein_g, carbohydrates_g, fat_g, datetime.now(), datetime.now()))
+        except sqlite3.IntegrityError as e:
+            print(f"Error inserting nutrition data: {e}")
 
     # Commit the changes
     conn.commit()

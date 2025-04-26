@@ -5,7 +5,7 @@ from src.utils.historical_health import import_historical_data
 from src.database.schema import metadata
 
 DATABASE_NAME = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../data/hevy_metal.db"))
-HEALTH_JSON_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../data/HealthAutoExport-2023-06-17-2025-04-23.json"))
+HEALTH_JSON_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../data/HealthAutoExport-2023-06-17-2025-04-26.json"))
 
 def create_new_database():
     """Creates a new SQLite database and applies the schema."""

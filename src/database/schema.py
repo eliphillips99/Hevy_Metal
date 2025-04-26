@@ -17,8 +17,6 @@ workouts_table = Table('workouts', metadata,
     Column('workout_description', String),
     Column('start_time', DateTime),
     Column('end_time', DateTime),
-    Column('duration', Float),
-    Column('routine_title', String),
     Column('created_at', DateTime),
     Column('updated_at', DateTime),
 )
