@@ -1,0 +1,42 @@
+import os
+from sqlalchemy import create_engine
+from src.utils.historical_hevy import main as populate_hevy_data
+from src.utils.historical_health import import_historical_data
+from src.database.schema import metadata
+
+DATABASE_NAME = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../data/hevy_metal.db"))
+HEALTH_JSON_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../data/HealthAutoExport-2023-06-17-2025-04-23.json"))
+
+def create_new_database():
+    """Creates a new SQLite database and applies the schema."""
+    print("Creating a new database...")
+    engine = create_engine(f"sqlite:///{DATABASE_NAME}")  # Use SQLAlchemy engine
+    metadata.create_all(bind=engine)  # Use SQLAlchemy metadata to create tables
+    print("Database schema creation complete.")
+
+def refresh_database():
+    # Step 1: Delete the existing database file
+    if os.path.exists(DATABASE_NAME):
+        print(f"Deleting existing database: {DATABASE_NAME}")
+        os.remove(DATABASE_NAME)
+    else:
+        print("No existing database found. Proceeding to create a new one.")
+
+    # Step 2: Create a new database and apply the schema
+    create_new_database()
+
+    # Step 3: Populate the database with Hevy workout data
+    print("Populating database with Hevy workout data...")
+    populate_hevy_data()
+
+    # Step 4: Populate the database with historical health data
+    if os.path.exists(HEALTH_JSON_FILE):
+        print("Populating database with historical health data...")
+        import_historical_data(HEALTH_JSON_FILE)
+    else:
+        print(f"Health JSON file not found: {HEALTH_JSON_FILE}. Skipping health data import.")
+
+    print("Database refresh complete.")
+
+if __name__ == "__main__":
+    refresh_database()

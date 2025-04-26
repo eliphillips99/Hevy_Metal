@@ -1,44 +1,116 @@
 import os
 import json
 import sqlite3
+from datetime import datetime
 
-def import_apple_health_data(json_file_path, db_path):
-    # Load JSON data
-    with open(json_file_path, 'r') as file:
-        health_data = json.load(file)
+DATABASE_NAME = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../data/hevy_metal.db"))
+JSON_FILE_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../data/HealthAutoExport-2023-06-17-2025-04-23.json"))
 
-    # Connect to the SQLite database
-    conn = sqlite3.connect(db_path)
+def get_or_create_common_data_id(cursor, date, source):
+    """
+    Get or create a common_data_id for a given date and source.
+    """
+    cursor.execute("""
+        SELECT common_data_id FROM common_data WHERE date = ? AND source = ?
+    """, (date, source))
+    result = cursor.fetchone()
+    if result:
+        return result[0]
+    
+    # Insert new common_data entry
+    cursor.execute("""
+        INSERT INTO common_data (date, source)
+        VALUES (?, ?)
+    """, (date, source))
+    return cursor.lastrowid
+
+def get_or_create_metric_id(cursor, metric_name, units, category="general"):
+    """
+    Get or create a metric_id for a given metric name.
+    """
+    cursor.execute("""
+        SELECT metric_id FROM metrics WHERE metric_name = ?
+    """, (metric_name,))
+    result = cursor.fetchone()
+    if result:
+        return result[0]
+    
+    # Insert new metric entry
+    cursor.execute("""
+        INSERT INTO metrics (metric_name, units, category)
+        VALUES (?, ?, ?)
+    """, (metric_name, units, category))
+    return cursor.lastrowid
+
+def import_daily_data(data, conn):
+    """
+    Imports one day's worth of health data into the database.
+    :param data: A dictionary containing the data for one day.
+    :param conn: SQLite connection object.
+    """
     cursor = conn.cursor()
 
-    # Ensure the table exists
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS apple_health_data (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            type TEXT,
-            value REAL,
-            unit TEXT,
-            start_date TEXT,
-            end_date TEXT
-        )
-    ''')
+    # Loop through each metric in the data
+    for metric in data.get("metrics", []):
+        metric_name = metric.get("name")
+        metric_units = metric.get("units")
+        metric_data = metric.get("data", [])
 
-    # Insert data into the table
-    for record in health_data:
-        cursor.execute('''
-            INSERT INTO apple_health_data (type, value, unit, start_date, end_date)
-            VALUES (?, ?, ?, ?, ?)
-        ''', (record.get('type'), record.get('value'), record.get('unit'), record.get('start_date'), record.get('end_date')))
+        # Get or create the metric_id
+        metric_id = get_or_create_metric_id(cursor, metric_name, metric_units)
 
-    # Commit changes and close the connection
+        # Insert each data entry for the metric
+        for entry in metric_data:
+            date = entry.get("date")
+            qty = entry.get("qty")
+            source = entry.get("source", "Unknown")
+
+            # Convert date to a datetime object
+            try:
+                timestamp = datetime.strptime(date, "%Y-%m-%d %H:%M:%S %z")
+            except ValueError as e:
+                print(f"Error parsing date '{date}': {e}")
+                continue
+
+            # Get or create the common_data_id
+            common_data_id = get_or_create_common_data_id(cursor, timestamp, source)
+
+            # Insert into the data table
+            try:
+                cursor.execute("""
+                    INSERT INTO data (common_data_id, metric_id, qty, data_json, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, (common_data_id, metric_id, qty, json.dumps(entry), datetime.now(), datetime.now()))
+            except sqlite3.IntegrityError as e:
+                print(f"Error inserting data for metric '{metric_name}': {e}")
+
+    # Commit the changes
     conn.commit()
+
+def import_historical_data(json_file_path):
+    """
+    Loops through the JSON file and imports all historical data into the database.
+    :param json_file_path: Path to the JSON file containing historical data.
+    """
+    if not os.path.exists(json_file_path):
+        print(f"JSON file not found: {json_file_path}")
+        return
+
+    # Load the JSON file
+    with open(json_file_path, "r") as file:
+        health_data = json.load(file)
+
+    # Connect to the database
+    conn = sqlite3.connect(DATABASE_NAME)
+
+    # Import the data
+    print("Importing historical health data...")
+    import_daily_data(health_data["data"], conn)
+
+    # Close the connection
     conn.close()
+    print("Historical data import complete.")
 
 if __name__ == "__main__":
-    # Define paths
-    data_dir = os.path.join(os.path.dirname(__file__), '..', 'data')
-    json_file_path = os.path.join(data_dir, 'apple_health_data.json')
-    db_path = os.path.join(os.path.dirname(__file__), '..', 'hevy_metal.db')
-
-    # Import data
-    import_apple_health_data(json_file_path, db_path)
+    # Import historical data
+    import_historical_data(JSON_FILE_PATH)

@@ -110,7 +110,7 @@ data_table = Table(
     Column('data_id', Integer, primary_key=True, autoincrement=True),
     Column('common_data_id', Integer, ForeignKey('common_data.common_data_id'), nullable=False),
     Column('metric_id', Integer, ForeignKey('metrics.metric_id'), nullable=False),
-    Column('qty', Float, nullable=False),
+    Column('qty', Float, nullable=True),
     Column('data_json', String), # to store the raw data
     Column('created_at', DateTime),
     Column('updated_at', DateTime)
