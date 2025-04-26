@@ -1,7 +1,16 @@
 import streamlit as st
 import pandas as pd
-from src.database.database_utils import *
 from datetime import date
+import sys
+import os
+
+# Dynamically add the project root to sys.path
+current_dir = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.abspath(os.path.join(current_dir, "../../"))
+if project_root not in sys.path:
+    sys.path.append(project_root)
+
+from src.database.database_utils import *
 
 st.title("Hevy Workout Analytics")
 st.subheader("Your Workout History")
