@@ -131,33 +131,40 @@ def pull_sleep_from_json(metric_data, cursor):
                 # Get or create the common_data_id
                 common_data_id = get_or_create_common_data_id(cursor, start_timestamp, source)
 
+
+                cursor.execute("""
+                    SELECT 1 FROM sleep_data
+                    WHERE common_data_id = ? AND start_time = ? AND end_time = ?
+                """, (common_data_id, start_timestamp, end_timestamp))
+
+                if cursor.fetchone() is None:
                 # Insert into the sleep_data table
-                try:
-                    cursor.execute("""
-                        INSERT INTO sleep_data (
-                            common_data_id, start_time, end_time, in_bed_duration_hours, sleep_duration_hours,
-                            awake_duration_hours, rem_sleep_duration_hours, deep_sleep_duration_hours,
-                            core_sleep_duration_hours, in_bed_start, in_bed_end, created_at, updated_at
-                        )
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """, (
-                        common_data_id,
-                        start_timestamp.strftime("%Y-%m-%d %H:%M:%S %z"),
-                        end_timestamp.strftime("%Y-%m-%d %H:%M:%S %z"),
-                        in_bed_duration,
-                        sleep_duration,
-                        awake_duration,
-                        rem_duration,
-                        deep_duration,
-                        core_duration,
-                        in_bed_start_timestamp.strftime("%Y-%m-%d %H:%M:%S %z") if in_bed_start_timestamp else None,
-                        in_bed_end_timestamp.strftime("%Y-%m-%d %H:%M:%S %z") if in_bed_end_timestamp else None,
-                        datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                        datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    ))
-                    #print(f"Inserted sleep cycle: Start: {start_time}, End: {end_time}, Source: {source}")
-                except sqlite3.IntegrityError as e:
-                    print(f"Error inserting sleep cycle data: {e}")
+                    try:
+                        cursor.execute("""
+                            INSERT INTO sleep_data (
+                                common_data_id, start_time, end_time, in_bed_duration_hours, sleep_duration_hours,
+                                awake_duration_hours, rem_sleep_duration_hours, deep_sleep_duration_hours,
+                                core_sleep_duration_hours, in_bed_start, in_bed_end, created_at, updated_at
+                            )
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """, (
+                            common_data_id,
+                            start_timestamp.strftime("%Y-%m-%d %H:%M:%S %z"),
+                            end_timestamp.strftime("%Y-%m-%d %H:%M:%S %z"),
+                            in_bed_duration,
+                            sleep_duration,
+                            awake_duration,
+                            rem_duration,
+                            deep_duration,
+                            core_duration,
+                            in_bed_start_timestamp.strftime("%Y-%m-%d %H:%M:%S %z") if in_bed_start_timestamp else None,
+                            in_bed_end_timestamp.strftime("%Y-%m-%d %H:%M:%S %z") if in_bed_end_timestamp else None,
+                            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                            datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        ))
+                        #print(f"Inserted sleep cycle: Start: {start_time}, End: {end_time}, Source: {source}")
+                    except sqlite3.IntegrityError as e:
+                        print(f"Error inserting sleep cycle data: {e}")
 
 def pull_nutrition_from_json(metric_data, metric_name, cursor, nutrition_data_grouped):
     for entry in metric_data:
@@ -195,17 +202,21 @@ def pull_nutrition_from_json(metric_data, metric_name, cursor, nutrition_data_gr
         sugar_g = nutrition_values.get("dietary_sugar")
 
         #print(f"Processing grouped nutrition entry: Date: {date}, Calories: {calories}, Protein: {protein_g}, Source: {source}")
-
-        # Convert date to a datetime object
         try:
             timestamp = datetime.strptime(date, "%Y-%m-%d %H:%M:%S %z")
         except ValueError as e:
             print(f"Error parsing nutrition date '{date}': {e}")
-            continue
+            #continue
 
         # Get or create the common_data_id
         common_data_id = get_or_create_common_data_id(cursor, timestamp, source)
 
+    cursor.execute("""
+        SELECT 1 FROM nutrition_data
+        WHERE common_data_id = ? AND calories = ? AND protein_g = ? AND water_floz = ?
+    """, (common_data_id, calories, protein_g, water_floz))
+
+    if cursor.fetchone() is None:
         # Insert into the nutrition_data table
         try:
             cursor.execute("""
@@ -231,6 +242,7 @@ def pull_markers_from_json(metric_data, metric_name, cursor, markers_data_groupe
 
                 # Group nutrition data by date and source
                 key = (date, source)
+                print(f"Grouping Key: {key}, Metric Name: {metric_name}, Qty: {qty}")
                 if key not in markers_data_grouped:
                     markers_data_grouped[key] = {
                         "time_in_daylight": None,
@@ -259,7 +271,7 @@ def pull_markers_from_json(metric_data, metric_name, cursor, markers_data_groupe
 
         #print(f"Processing grouped nutrition entry: Date: {date}, Body Weight: {body_weight_lbs}")
 
-        print(time_in_daylight, vo2_max, heart_rate, heart_rate_variability, resting_heart_rate, respiratory_rate, blood_oxygen_saturation, body_weight_lbs, body_mass_index)
+        print(vo2_max, heart_rate, heart_rate_variability, resting_heart_rate, respiratory_rate, blood_oxygen_saturation, body_weight_lbs, body_mass_index)
 
         # Convert date to a datetime object
         try:
@@ -271,19 +283,25 @@ def pull_markers_from_json(metric_data, metric_name, cursor, markers_data_groupe
         # Get or create the common_data_id
         common_data_id = get_or_create_common_data_id(cursor, timestamp, source)
 
-        # Insert into the nutrition_data table
-        try:
-            cursor.execute("""
-                INSERT INTO health_markers (common_data_id, time_in_daylight_min, vo2_max, heart_rate, heart_rate_variability,
-                           resting_heart_rate, respiratory_rate, blood_oxygen_saturation, body_mass_index, body_weight_lbs, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (common_data_id, time_in_daylight, vo2_max, heart_rate, heart_rate_variability, resting_heart_rate, respiratory_rate, blood_oxygen_saturation,
-                  body_mass_index, body_weight_lbs,
-                  datetime.now().strftime("%Y-%m-%d %H:%M:%S"), 
-                  datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+        cursor.execute("""
+        SELECT 1 FROM health_markers
+        WHERE common_data_id = ? AND body_weight_lbs = ? AND time_in_daylight_min = ?
+        """, (common_data_id, body_weight_lbs, time_in_daylight))
 
-        except sqlite3.IntegrityError as e:
-            print(f"Error inserting grouped nutrition data: {e}")   
+        if cursor.fetchone() is None:
+        # Insert into the nutrition_data table
+            try:
+                cursor.execute("""
+                    INSERT INTO health_markers (common_data_id, time_in_daylight_min, vo2_max, heart_rate, heart_rate_variability,
+                            resting_heart_rate, respiratory_rate, blood_oxygen_saturation, body_mass_index, body_weight_lbs, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (common_data_id, time_in_daylight, vo2_max, heart_rate, heart_rate_variability, resting_heart_rate, respiratory_rate, blood_oxygen_saturation,
+                    body_mass_index, body_weight_lbs,
+                    datetime.now().strftime("%Y-%m-%d %H:%M:%S"), 
+                    datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+
+            except sqlite3.IntegrityError as e:
+                print(f"Error inserting grouped nutrition data: {e}")   
 
 
 def import_daily_data(data, conn):
