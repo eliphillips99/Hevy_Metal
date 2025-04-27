@@ -80,7 +80,7 @@ def store_workouts_in_sqlite(workouts):
         try:
             cursor.execute("""
                 INSERT INTO workouts (common_data_id, hevy_workout_id, workout_name, workout_description, start_time, end_time, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """, (common_data_id, hevy_workout_id, workout_name, workout_description, start_time, end_time, created_at, updated_at))
         except sqlite3.IntegrityError as e:
             print(f"Error inserting workout {hevy_workout_id}: {e}")

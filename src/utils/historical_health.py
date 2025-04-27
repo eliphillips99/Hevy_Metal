@@ -7,6 +7,28 @@ from datetime import date
 DATABASE_NAME = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../data/hevy_metal.db"))
 JSON_FILE_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../data/HealthAutoExport-2023-06-17-2025-04-26.json"))
 
+# Metric name mapping
+METRIC_NAME_MAPPING = {
+    "weight_body_mass": "body_weight_lbs",
+    "dietary_energy": "calories",
+    "dietary_caffeine": "caffeine_mg",
+    "dietary_water": "water_floz",
+    "sodium": "sodium_mg",
+    "fiber": "fiber_g",
+    "potassium": "potassium_mg",
+    "carbohydrates": "carbohydrates_g",
+    "dietary_sugar": "sugar_g",
+    "total_fat": "fat_g",
+    "time_in_daylight": "time_in_daylight",
+    "vo2_max": "vo2_max",
+    "heart_rate": "heart_rate",
+    "heart_rate_variability": "heart_rate_variability",
+    "resting_heart_rate": "resting_heart_rate",
+    "respiratory_rate": "respiratory_rate",
+    "blood_oxygen_saturation": "blood_oxygen_saturation",
+    "body_mass_index": "body_mass_index"
+}
+
 def get_or_create_common_data_id(cursor, date, source):
     """
     Get or create a common_data_id for a given date and source.
@@ -172,7 +194,7 @@ def pull_nutrition_from_json(metric_data, metric_name, cursor, nutrition_data_gr
         sodium_mg = nutrition_values.get("sodium")
         sugar_g = nutrition_values.get("dietary_sugar")
 
-        print(f"Processing grouped nutrition entry: Date: {date}, Calories: {calories}, Protein: {protein_g}, Source: {source}")
+        #print(f"Processing grouped nutrition entry: Date: {date}, Calories: {calories}, Protein: {protein_g}, Source: {source}")
 
         # Convert date to a datetime object
         try:
@@ -235,7 +257,9 @@ def pull_markers_from_json(metric_data, metric_name, cursor, markers_data_groupe
         body_mass_index = marker_values.get("body_mass_index")
 
 
-        print(f"Processing grouped nutrition entry: Date: {date}, Body Weight: {body_weight_lbs}")
+        #print(f"Processing grouped nutrition entry: Date: {date}, Body Weight: {body_weight_lbs}")
+
+        print(time_in_daylight, vo2_max, heart_rate, heart_rate_variability, resting_heart_rate, respiratory_rate, blood_oxygen_saturation, body_weight_lbs, body_mass_index)
 
         # Convert date to a datetime object
         try:
@@ -250,7 +274,7 @@ def pull_markers_from_json(metric_data, metric_name, cursor, markers_data_groupe
         # Insert into the nutrition_data table
         try:
             cursor.execute("""
-                INSERT INTO health_markers (common_data_id, time_in_daylight_hours, vo2_max, heart_rate, heart_rate_variability,
+                INSERT INTO health_markers (common_data_id, time_in_daylight_min, vo2_max, heart_rate, heart_rate_variability,
                            resting_heart_rate, respiratory_rate, blood_oxygen_saturation, body_mass_index, body_weight_lbs, created_at, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (common_data_id, time_in_daylight, vo2_max, heart_rate, heart_rate_variability, resting_heart_rate, respiratory_rate, blood_oxygen_saturation,
@@ -279,6 +303,9 @@ def import_daily_data(data, conn):
         metric_name = metric.get("name")
         metric_units = metric.get("units")
         metric_data = metric.get("data", [])
+        # Translate metric name using the mapping
+        metric_name = METRIC_NAME_MAPPING.get(metric_name, metric_name)
+        print(f"Mapped Metric Name: {metric_name}")
         insert_raw_data(cursor, metric_name, metric_units, metric_data)
         # Handle sleep_analysis specifically
         if metric_name == "sleep_analysis":
@@ -338,6 +365,6 @@ def import_historical_data(json_file_path, target_date=None):
 if __name__ == "__main__":
     # Import historical data
     target_date = date(2024, 4, 25)  # Set to a specific date if needed
-    import_historical_data(JSON_FILE_PATH, target_date)
+    import_historical_data(JSON_FILE_PATH)
 
 

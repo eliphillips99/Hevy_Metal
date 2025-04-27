@@ -108,7 +108,7 @@ health_markers_table = Table(
     'health_markers', metadata,
     Column('health_marker_id', Integer, primary_key=True, autoincrement=True),
     Column('common_data_id', Integer, ForeignKey('common_data.common_data_id'), nullable=False),
-    Column('time_in_daylight_hours', Float),
+    Column('time_in_daylight_min', Float),
     Column('vo2_max', Float),
     Column('heart_rate', Float),
     Column('heart_rate_variability', Float),
