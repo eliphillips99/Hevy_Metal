@@ -174,6 +174,7 @@ def pull_nutrition_from_json(metric_data, metric_name, cursor, nutrition_data_gr
 
         # Group nutrition data by date and source
         key = (date, source)
+        print(f"Grouping Key: {key}, Metric Name: {metric_name}, Qty: {qty}")
         if key not in nutrition_data_grouped:
             nutrition_data_grouped[key] = {
                 "dietary_energy": None,
@@ -210,15 +211,13 @@ def pull_nutrition_from_json(metric_data, metric_name, cursor, nutrition_data_gr
 
         # Get or create the common_data_id
         common_data_id = get_or_create_common_data_id(cursor, timestamp, source)
+        print(f"Timestamp: {timestamp}, Source: {source}, Common Data ID: {common_data_id}")
 
-    cursor.execute("""
-        SELECT 1 FROM nutrition_data
-        WHERE common_data_id = ? AND calories = ? AND protein_g = ? AND water_floz = ?
-    """, (common_data_id, calories, protein_g, water_floz))
-
-    if cursor.fetchone() is None:
-        # Insert into the nutrition_data table
-        try:
+        cursor.execute("""
+            SELECT 1 FROM health_markers WHERE common_data_id = ?
+        """, (common_data_id,))
+        if cursor.fetchone() is None:
+            # Insert a new row
             cursor.execute("""
                 INSERT INTO nutrition_data (
                     common_data_id, calories, protein_g, carbohydrates_g, fat_g, water_floz, caffeine_mg,
@@ -231,8 +230,27 @@ def pull_nutrition_from_json(metric_data, metric_name, cursor, nutrition_data_gr
                 datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             ))
-        except sqlite3.IntegrityError as e:
-            print(f"Error inserting grouped nutrition data: {e}")
+        else:
+            # Update the existing row
+            cursor.execute("""
+                UPDATE nutrition_data
+                SET calories = COALESCE(?, calories),
+                    protein_g = COALESCE(?, protein_g),
+                    carbohydrates_g = COALESCE(?, carbohydrates_g),
+                    fat_g = COALESCE(?, fat_g),
+                    water_floz = COALESCE(?, water_floz),
+                    caffeine_mg = COALESCE(?, caffeine_mg),
+                    potassium_mg = COALESCE(?, potassium_mg),
+                    fiber_g = COALESCE(?, fiber_g),
+                    sodium_mg = COALESCE(?, sodium_mg),
+                    sugar_g = COALESCE(?, sugar_g),
+                    updated_at = ?
+                WHERE common_data_id = ?
+            """, (
+                calories, protein_g, carbohydrates_g, fat_g, water_floz, caffeine_mg,
+                potassium_mg, fiber_g, sodium_mg, sugar_g,
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S"), common_data_id
+            ))
 
 def pull_markers_from_json(metric_data, metric_name, cursor, markers_data_grouped):
      for entry in metric_data:
@@ -271,7 +289,7 @@ def pull_markers_from_json(metric_data, metric_name, cursor, markers_data_groupe
 
         #print(f"Processing grouped nutrition entry: Date: {date}, Body Weight: {body_weight_lbs}")
 
-        print(vo2_max, heart_rate, heart_rate_variability, resting_heart_rate, respiratory_rate, blood_oxygen_saturation, body_weight_lbs, body_mass_index)
+        #print(vo2_max, heart_rate, heart_rate_variability, resting_heart_rate, respiratory_rate, blood_oxygen_saturation, body_weight_lbs, body_mass_index)
 
         # Convert date to a datetime object
         try:
@@ -289,20 +307,40 @@ def pull_markers_from_json(metric_data, metric_name, cursor, markers_data_groupe
         """, (common_data_id, body_weight_lbs, time_in_daylight))
 
         if cursor.fetchone() is None:
-        # Insert into the nutrition_data table
-            try:
-                cursor.execute("""
-                    INSERT INTO health_markers (common_data_id, time_in_daylight_min, vo2_max, heart_rate, heart_rate_variability,
-                            resting_heart_rate, respiratory_rate, blood_oxygen_saturation, body_mass_index, body_weight_lbs, created_at, updated_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, (common_data_id, time_in_daylight, vo2_max, heart_rate, heart_rate_variability, resting_heart_rate, respiratory_rate, blood_oxygen_saturation,
-                    body_mass_index, body_weight_lbs,
-                    datetime.now().strftime("%Y-%m-%d %H:%M:%S"), 
-                    datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
-
-            except sqlite3.IntegrityError as e:
-                print(f"Error inserting grouped nutrition data: {e}")   
-
+            # Insert a new row
+            cursor.execute("""
+                INSERT INTO health_markers (
+                    common_data_id, time_in_daylight_min, vo2_max, heart_rate, heart_rate_variability,
+                    resting_heart_rate, respiratory_rate, blood_oxygen_saturation, body_mass_index, body_weight_lbs,
+                    created_at, updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                common_data_id, time_in_daylight, vo2_max, heart_rate, heart_rate_variability,
+                resting_heart_rate, respiratory_rate, blood_oxygen_saturation, body_mass_index, body_weight_lbs,
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            ))
+        else:
+            # Update the existing row
+            cursor.execute("""
+                UPDATE health_markers
+                SET time_in_daylight_min = COALESCE(?, time_in_daylight_min),
+                    vo2_max = COALESCE(?, vo2_max),
+                    heart_rate = COALESCE(?, heart_rate),
+                    heart_rate_variability = COALESCE(?, heart_rate_variability),
+                    resting_heart_rate = COALESCE(?, resting_heart_rate),
+                    respiratory_rate = COALESCE(?, respiratory_rate),
+                    blood_oxygen_saturation = COALESCE(?, blood_oxygen_saturation),
+                    body_mass_index = COALESCE(?, body_mass_index),
+                    body_weight_lbs = COALESCE(?, body_weight_lbs),
+                    updated_at = ?
+                WHERE common_data_id = ?
+            """, (
+                time_in_daylight, vo2_max, heart_rate, heart_rate_variability, resting_heart_rate,
+                respiratory_rate, blood_oxygen_saturation, body_mass_index, body_weight_lbs,
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S"), common_data_id
+            ))
 
 def import_daily_data(data, conn):
     """
