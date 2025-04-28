@@ -174,47 +174,46 @@ def pull_nutrition_from_json(metric_data, metric_name, cursor, nutrition_data_gr
 
         # Group nutrition data by date and source
         key = (date, source)
-        print(f"Grouping Key: {key}, Metric Name: {metric_name}, Qty: {qty}")
+        #print(f"Grouping Key: {key}, Metric Name: {metric_name}, Qty: {qty}")
         if key not in nutrition_data_grouped:
             nutrition_data_grouped[key] = {
-                "dietary_energy": None,
+                "calories": None,
                 "protein": None,
-                "carbohydrates": None,
-                "fat": None,
-                "dietary_water": None,
-                "dietary_caffeine": None,
-                "potassium": None,
-                "fiber": None,
-                "sodium": None,
-                "dietary_sugar": None
+                "carbohydrates_g": None,
+                "fat_g": None,
+                "water_floz": None,
+                "caffeine_mg": None,
+                "potassium_mg": None,
+                "fiber_g": None,
+                "sodium_mg": None,
+                "sugar_g": None
             }
         nutrition_data_grouped[key][metric_name] = qty
+        #print(f"Grouped Key: {key}, Metric: {metric_name}, Qty: {qty}")  # Debug stateme
 
     for (date, source), nutrition_values in nutrition_data_grouped.items():
-        calories = nutrition_values.get("dietary_energy")
+        calories = nutrition_values.get("calories")
         protein_g = nutrition_values.get("protein")
-        carbohydrates_g = nutrition_values.get("carbohydrates")
-        fat_g = nutrition_values.get("fat")
-        water_floz = nutrition_values.get("dietary_water")
-        caffeine_mg = nutrition_values.get("dietary_caffeine")
-        potassium_mg = nutrition_values.get("potassium")
-        fiber_g = nutrition_values.get("fiber")
-        sodium_mg = nutrition_values.get("sodium")
-        sugar_g = nutrition_values.get("dietary_sugar")
+        carbohydrates_g = nutrition_values.get("carbohydrates_g")
+        fat_g = nutrition_values.get("fat_g")
+        water_floz = nutrition_values.get("water_floz")
+        caffeine_mg = nutrition_values.get("caffeine_mg")
+        potassium_mg = nutrition_values.get("potassium_mg")
+        fiber_g = nutrition_values.get("fiber_g")
+        sodium_mg = nutrition_values.get("sodium_mg")
+        sugar_g = nutrition_values.get("sugar_g")
 
-        #print(f"Processing grouped nutrition entry: Date: {date}, Calories: {calories}, Protein: {protein_g}, Source: {source}")
         try:
             timestamp = datetime.strptime(date, "%Y-%m-%d %H:%M:%S %z")
         except ValueError as e:
             print(f"Error parsing nutrition date '{date}': {e}")
-            #continue
+            continue
 
         # Get or create the common_data_id
         common_data_id = get_or_create_common_data_id(cursor, timestamp, source)
-        print(f"Timestamp: {timestamp}, Source: {source}, Common Data ID: {common_data_id}")
 
         cursor.execute("""
-            SELECT 1 FROM health_markers WHERE common_data_id = ?
+            SELECT 1 FROM nutrition_data WHERE common_data_id = ?
         """, (common_data_id,))
         if cursor.fetchone() is None:
             # Insert a new row
@@ -260,7 +259,7 @@ def pull_markers_from_json(metric_data, metric_name, cursor, markers_data_groupe
 
                 # Group nutrition data by date and source
                 key = (date, source)
-                print(f"Grouping Key: {key}, Metric Name: {metric_name}, Qty: {qty}")
+                #print(f"Grouping Key: {key}, Metric Name: {metric_name}, Qty: {qty}")
                 if key not in markers_data_grouped:
                     markers_data_grouped[key] = {
                         "time_in_daylight": None,
@@ -268,7 +267,7 @@ def pull_markers_from_json(metric_data, metric_name, cursor, markers_data_groupe
                         "heart_rate": None,
                         "heart_rate_variability": None,
                         "resting_heart_rate": None,
-                        "respitory_rate": None,
+                        "respiratory_rate": None,
                         "blood_oxygen_saturation": None,
                         "body_weight_lbs": None,
                         "body_mass_index": None,
@@ -348,10 +347,14 @@ def import_daily_data(data, conn):
     """
     cursor = conn.cursor()
 
-    nutrition_metrics = ["protein", "dietary_energy", "dietary_caffeine", "dietary_water", "sodium", "fiber", "potassium", "carbohydrates", "sugar", "fat"]
+    nutrition_metrics = [
+        "calories", "protein", "carbohydrates_g", "fat_g", "water_floz", "caffeine_mg",
+        "potassium_mg", "fiber_g", "sodium_mg", "sugar_g"]
     nutrition_data_grouped = {}
 
-    markers_metrics = ["time_in_daylight", "vo2_max", "heart_rate", "heart_rate_variability", "resting_heart_rate", "respiratory_rate", "blood_oxygen_saturation", "body_weight_lbs", "body_mass_index"]    
+    markers_metrics = [
+        "time_in_daylight", "vo2_max", "heart_rate", "heart_rate_variability", "resting_heart_rate",
+        "respiratory_rate", "blood_oxygen_saturation", "body_weight_lbs", "body_mass_index"]
     markers_data_grouped = {}
 
     # Import metrics data
@@ -361,13 +364,14 @@ def import_daily_data(data, conn):
         metric_data = metric.get("data", [])
         # Translate metric name using the mapping
         metric_name = METRIC_NAME_MAPPING.get(metric_name, metric_name)
-        print(f"Mapped Metric Name: {metric_name}")
+        print(f"Mapped Metric Name: {metric_name}, Original Name: {metric.get('name')}")
         insert_raw_data(cursor, metric_name, metric_units, metric_data)
         # Handle sleep_analysis specifically
         if metric_name == "sleep_analysis":
             pull_sleep_from_json(metric_data, cursor)
 
         elif metric_name in nutrition_metrics:
+            print(f"Calling pull_nutrition_from_json for Metric: {metric_name}")
             pull_nutrition_from_json(metric_data, metric_name, cursor, nutrition_data_grouped)
 
         elif metric_name in markers_metrics:
