@@ -55,20 +55,20 @@ metrics = Table('metrics', metadata,
     Column('category', String, nullable=False)
 )
 
-
-sleep_data_table = Table('sleep_data', metadata,
+sleep_data_table = Table(
+    'sleep_data', metadata,
     Column('sleep_data_id', Integer, primary_key=True, autoincrement=True),
     Column('common_data_id', Integer, ForeignKey('common_data.common_data_id'), nullable=False),
     Column('start_time', DateTime, nullable=False),
     Column('end_time', DateTime, nullable=False),
-    Column('in_bed_duration_hours', Float),  # inBed from JSON
-    Column('sleep_duration_hours', Float), # asleep from JSON
-    Column('awake_duration_hours', Float),  # awake from JSON
-    Column('rem_sleep_duration_hours', Float),    # rem from JSON
-    Column('deep_sleep_duration_hours', Float),   # deep from JSON
-    Column('core_sleep_duration_hours', Float), # core from JSON
-    Column('in_bed_start', DateTime), 
-    Column('in_bed_end', DateTime),   
+    Column('in_bed_duration_hours', Float),
+    Column('sleep_duration_hours', Float),
+    Column('awake_duration_hours', Float),
+    Column('rem_sleep_duration_hours', Float),
+    Column('deep_sleep_duration_hours', Float),
+    Column('core_sleep_duration_hours', Float),
+    Column('in_bed_start', DateTime),
+    Column('in_bed_end', DateTime),
     Column('created_at', DateTime),
     Column('updated_at', DateTime)
 )

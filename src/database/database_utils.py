@@ -1,9 +1,28 @@
 # workout-analytics/database_utils.py
-from sqlalchemy import create_engine, MetaData
+from sqlalchemy import create_engine, MetaData, select, and_
 from sqlalchemy.orm import sessionmaker, Session
 from datetime import date
 import os
 from src.database.queries.hevy_sql_queries import *
+from src.database.schema import (
+    nutrition_data_table,
+    sleep_data_table,
+    health_markers_table,
+    diet_cycles_table,
+    workouts_table,
+    exercises_table,
+    workout_exercises_table,
+    sets_table
+)
+from src.database.queries.nutrition_queries import get_nutrition_data_query
+from src.database.queries.sleep_queries import get_sleep_data_query
+from src.database.queries.health_markers_queries import get_health_markers_query
+from src.database.queries.diet_cycles_queries import (
+    insert_diet_cycle_query,
+    update_diet_cycle_end_date_query,
+    get_current_diet_cycle_query,
+    get_all_diet_cycles_query
+)
 
 #DATABASE_NAME = os.path.join("data", "hevy_metal.db")  # Updated to point to the data directory
 DATABASE_NAME = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../data/hevy_metal.db"))
@@ -32,7 +51,17 @@ def fetch_all(db: Session, query):
     return db.execute(query).fetchall()
 
 def get_all_workouts(db: Session, start_date: date = None, end_date: date = None):
-    query = get_all_workouts_query(start_date, end_date)
+    query = select(
+        workouts_table.c.workout_id,
+        workouts_table.c.workout_name.label("Title"),
+        workouts_table.c.start_time,
+        workouts_table.c.end_time
+    ).where(
+        and_(
+            workouts_table.c.start_time >= start_date,
+            workouts_table.c.start_time <= end_date
+        )
+    ).order_by(workouts_table.c.start_time.desc())
     return fetch_all(db, query)
 
 def get_exercises_in_workout(db: Session, workout_id: str):
@@ -91,6 +120,18 @@ def get_all_diet_cycles(db: Session, start_date: date = None, end_date: date = N
 # def get_nutrition_on_date(db: Session, target_date: date = None, start_date: date = None, end_date: date = None):
 #     query = get_nutrition_on_date_query(target_date, start_date, end_date)
 #     return fetch_all(db, query)
+
+def get_nutrition_data(db: Session, start_date: date = None, end_date: date = None):
+    query = get_nutrition_data_query(start_date, end_date)
+    return fetch_all(db, query)
+
+def get_sleep_data(db: Session, start_date: date = None, end_date: date = None):
+    query = get_sleep_data_query(start_date, end_date)
+    return fetch_all(db, query)
+
+def get_health_markers(db: Session, start_date: date = None, end_date: date = None):
+    query = get_health_markers_query(start_date, end_date)
+    return fetch_all(db, query)
 
 if __name__ == "__main__":
     from sqlalchemy.orm import Session
