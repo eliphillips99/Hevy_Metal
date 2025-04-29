@@ -61,10 +61,11 @@ elif page == "Sleep":
     st.write("Debug: Sleep Data Structure", sleep_data[0])
 
     if sleep_data:
-        # Dynamically adjust column names based on the actual structure of the returned data
+        # Updated column names to include Date, Start Time, and End Time
         column_names = [
-            "Date", "Awake Duration (hrs)", "REM Sleep (hrs)", "Deep Sleep (hrs)",
-            "Core Sleep (hrs)", "In Bed Duration (hrs)", "In Bed Start", "In Bed End"
+            "Date", "Source", "Start Time", "End Time", "In Bed Duration (hrs)", "Sleep Duration (hrs)",
+            "Awake Duration (hrs)", "REM Sleep (hrs)", "Deep Sleep (hrs)", "Core Sleep (hrs)",
+            "In Bed Start", "In Bed End"
         ]
         if len(sleep_data[0]) != len(column_names):
             st.error(f"Mismatch in column count: Expected {len(column_names)}, but got {len(sleep_data[0])}")
@@ -86,8 +87,8 @@ elif page == "Health Markers":
     if health_markers:
         # Ensure all columns from the query are included
         column_names = [
-            "Date", "Heart Rate", "VO2 Max", "Body Weight (lbs)", "BMI",
-            "Respiratory Rate", "Blood Oxygen Saturation"
+            "Date", "Time in Daylight (min)", "Heart Rate", "VO2 Max", "Body Weight (lbs)", "BMI",
+            "Heart Rate Variability", "Resting Heart Rate", "Respiratory Rate", "Blood Oxygen Saturation"
         ]
         if len(health_markers[0]) != len(column_names):
             st.error(f"Mismatch in column count: Expected {len(column_names)}, but got {len(health_markers[0])}")

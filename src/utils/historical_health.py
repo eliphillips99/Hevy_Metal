@@ -277,6 +277,10 @@ def pull_markers_from_json(metric_data, metric_name, cursor, markers_data_groupe
         markers_data_grouped[key][metric_name] = qty
 
     for (date, source), marker_values in markers_data_grouped.items():
+        # Skip entries where all marker values are None
+        if all(value is None for value in marker_values.values()):
+            continue
+
         time_in_daylight = marker_values.get("time_in_daylight")
         vo2_max = marker_values.get("vo2_max")
         heart_rate = marker_values.get("heart_rate")
