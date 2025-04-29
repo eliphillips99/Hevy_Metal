@@ -1,18 +1,31 @@
 from sqlalchemy import select, and_
-from src.database.schema import nutrition_data_table
+from src.database.schema import nutrition_data_table, common_data  # Use the correct table name
 
 def get_nutrition_data_query(start_date=None, end_date=None):
+    # Debugging: Log the input parameters
+    print(f"get_nutrition_data_query called with start_date={start_date}, end_date={end_date}")
+
+    # Join nutrition_data_table with common_data to filter by date
     query = select(
-        nutrition_data_table.c.timestamp.label("Date"),
-        nutrition_data_table.c.protein_g.label("Protein (g)")
-    ).order_by(nutrition_data_table.c.timestamp)
+        common_data.c.date.label("Date"),
+        nutrition_data_table.c.protein_g.label("Protein (g)"),
+        nutrition_data_table.c.calories.label("Calories"),
+        nutrition_data_table.c.carbohydrates_g.label("Carbohydrates (g)"),
+        nutrition_data_table.c.fat_g.label("Fat (g)")
+    ).join(
+        common_data, nutrition_data_table.c.common_data_id == common_data.c.common_data_id
+    ).order_by(common_data.c.date)
 
     if start_date or end_date:
         conditions = []
         if start_date:
-            conditions.append(nutrition_data_table.c.timestamp >= start_date)
+            conditions.append(common_data.c.date >= start_date)
         if end_date:
-            conditions.append(nutrition_data_table.c.timestamp <= end_date)
+            conditions.append(common_data.c.date <= end_date)
         query = query.where(and_(*conditions))
+
+    # Debugging: Log the generated query
+    print("Generated Nutrition Data Query:")
+    print(query)
 
     return query
