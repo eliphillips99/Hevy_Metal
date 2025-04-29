@@ -123,7 +123,18 @@ def get_all_diet_cycles(db: Session, start_date: date = None, end_date: date = N
 
 def get_nutrition_data(db: Session, start_date: date = None, end_date: date = None):
     query = get_nutrition_data_query(start_date, end_date)
-    return fetch_all(db, query)
+
+    # Debugging: Log the SQL query and parameters
+    print("Executing Nutrition Data Query:")
+    print(query)
+
+    results = fetch_all(db, query)
+
+    # Debugging: Log the raw results
+    print("Nutrition Data Query Results:")
+    print(results)
+
+    return results
 
 def get_sleep_data(db: Session, start_date: date = None, end_date: date = None):
     query = get_sleep_data_query(start_date, end_date)

@@ -35,10 +35,19 @@ elif page == "Nutrition":
     start_date = st.sidebar.date_input("Start Date", value=date(2025, 1, 1))
     end_date = st.sidebar.date_input("End Date", value=date.today())
     nutrition_data = get_nutrition_data(db, start_date=start_date, end_date=end_date)
+
+    # Debugging: Log raw query results
+    st.write("Debug: Raw Nutrition Data", nutrition_data)
+
     if nutrition_data:
-        df_nutrition = pd.DataFrame(nutrition_data, columns=["Date", "Protein (g)"])
-        st.dataframe(df_nutrition)
-        st.line_chart(df_nutrition.set_index("Date"))
+        # Ensure all columns from the query are included
+        column_names = ["Date", "Protein (g)", "Calories", "Carbohydrates (g)", "Fat (g)"]
+        if len(nutrition_data[0]) != len(column_names):
+            st.error(f"Mismatch in column count: Expected {len(column_names)}, but got {len(nutrition_data[0])}")
+        else:
+            df_nutrition = pd.DataFrame(nutrition_data, columns=column_names)
+            st.dataframe(df_nutrition)
+            st.line_chart(df_nutrition.set_index("Date")["Protein (g)"])
     else:
         st.info("No nutrition data found for the selected date range.")
 
@@ -47,9 +56,21 @@ elif page == "Sleep":
     start_date = st.sidebar.date_input("Start Date", value=date(2025, 1, 1))
     end_date = st.sidebar.date_input("End Date", value=date.today())
     sleep_data = get_sleep_data(db, start_date=start_date, end_date=end_date)
+
+    # Debugging the structure of the returned data
+    st.write("Debug: Sleep Data Structure", sleep_data[0])
+
     if sleep_data:
-        df_sleep = pd.DataFrame(sleep_data, columns=["Date", "Sleep Duration (hrs)", "REM Sleep (hrs)", "Deep Sleep (hrs)"])
-        st.dataframe(df_sleep)
+        # Dynamically adjust column names based on the actual structure of the returned data
+        column_names = [
+            "Date", "Awake Duration (hrs)", "REM Sleep (hrs)", "Deep Sleep (hrs)",
+            "Core Sleep (hrs)", "In Bed Duration (hrs)", "In Bed Start", "In Bed End"
+        ]
+        if len(sleep_data[0]) != len(column_names):
+            st.error(f"Mismatch in column count: Expected {len(column_names)}, but got {len(sleep_data[0])}")
+        else:
+            df_sleep = pd.DataFrame(sleep_data, columns=column_names)
+            st.dataframe(df_sleep)
     else:
         st.info("No sleep data found for the selected date range.")
 
@@ -58,9 +79,21 @@ elif page == "Health Markers":
     start_date = st.sidebar.date_input("Start Date", value=date(2025, 1, 1))
     end_date = st.sidebar.date_input("End Date", value=date.today())
     health_markers = get_health_markers(db, start_date=start_date, end_date=end_date)
+
+    # Debugging: Log raw query results
+    st.write("Debug: Raw Health Markers Data", health_markers)
+
     if health_markers:
-        df_health = pd.DataFrame(health_markers, columns=["Date", "Heart Rate", "VO2 Max", "Body Weight (lbs)", "BMI"])
-        st.dataframe(df_health)
+        # Ensure all columns from the query are included
+        column_names = [
+            "Date", "Heart Rate", "VO2 Max", "Body Weight (lbs)", "BMI",
+            "Respiratory Rate", "Blood Oxygen Saturation"
+        ]
+        if len(health_markers[0]) != len(column_names):
+            st.error(f"Mismatch in column count: Expected {len(column_names)}, but got {len(health_markers[0])}")
+        else:
+            df_health = pd.DataFrame(health_markers, columns=column_names)
+            st.dataframe(df_health)
     else:
         st.info("No health marker data found for the selected date range.")
 

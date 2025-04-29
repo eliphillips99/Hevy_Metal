@@ -66,9 +66,9 @@ sleep_data_table = Table(
     Column('awake_duration_hours', Float),
     Column('rem_sleep_duration_hours', Float),
     Column('deep_sleep_duration_hours', Float),
-    Column('core_sleep_duration_hours', Float),
-    Column('in_bed_start', DateTime),
-    Column('in_bed_end', DateTime),
+    Column('core_sleep_duration_hours', Float),  # Ensure this field exists
+    Column('in_bed_start', DateTime),  # Ensure this field exists
+    Column('in_bed_end', DateTime),  # Ensure this field exists
     Column('created_at', DateTime),
     Column('updated_at', DateTime)
 )
