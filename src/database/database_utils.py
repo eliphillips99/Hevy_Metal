@@ -1,8 +1,9 @@
 # workout-analytics/database_utils.py
-from sqlalchemy import create_engine, MetaData, select, and_
+from sqlalchemy import create_engine, MetaData, select, and_, insert
 from sqlalchemy.orm import sessionmaker, Session
-from datetime import date
+from datetime import date, datetime
 import os
+import pandas as pd
 from src.database.queries.hevy_sql_queries import *
 from src.database.schema import (
     nutrition_data_table,
@@ -12,7 +13,8 @@ from src.database.schema import (
     workouts_table,
     exercises_table,
     workout_exercises_table,
-    sets_table
+    sets_table,
+    diet_weeks_table
 )
 from src.database.queries.nutrition_queries import get_nutrition_data_query
 from src.database.queries.sleep_queries import get_sleep_data_query
@@ -21,7 +23,9 @@ from src.database.queries.diet_cycles_queries import (
     insert_diet_cycle_query,
     update_diet_cycle_end_date_query,
     get_current_diet_cycle_query,
-    get_all_diet_cycles_query
+    get_all_diet_cycles_query,
+    insert_diet_week_query, 
+    get_diet_weeks_query
 )
 
 #DATABASE_NAME = os.path.join("data", "hevy_metal.db")  # Updated to point to the data directory
@@ -110,6 +114,76 @@ def get_current_diet_cycle(db: Session, on_date: date = None):
 def get_all_diet_cycles(db: Session, start_date: date = None, end_date: date = None):
     query = get_all_diet_cycles_query(start_date, end_date)
     return fetch_all(db, query)
+
+def get_diet_weeks(db, diet_cycle_id):
+    query = get_diet_weeks_query(diet_cycle_id)
+    return fetch_all(db, query)
+
+def insert_common_data(db, date, source=None):
+    """Insert a new record into the common_data table and return the generated common_data_id."""
+    stmt = insert(common_data).values(
+        date=date,
+        source=source
+    )
+    result = db.execute(stmt)
+    db.commit()
+    return result.inserted_primary_key[0]
+
+def insert_diet_week(db, week_start_date, calorie_target, cycle_id, source=None):
+    try:
+        # Generate a common_data_id
+        common_data_id = insert_common_data(db, date=week_start_date, source=source)
+
+        # Insert into diet_weeks_table
+        stmt = insert(diet_weeks_table).values(
+            week_start_date=week_start_date,
+            calorie_target=calorie_target,
+            cycle_id=cycle_id,
+            common_data_id=common_data_id,
+            created_at=datetime.now(),
+            updated_at=datetime.now()
+        )
+        db.execute(stmt)
+        db.commit()
+
+        # Update diet_weeks.csv
+        update_diet_weeks_csv(db)
+
+        return "Diet week added successfully."
+    except Exception as e:
+        db.rollback()
+        return f"Error adding diet week: {e}"
+
+def update_diet_weeks_csv(db):
+    """Fetch all diet weeks and update the diet_weeks.csv file."""
+    query = select([
+        diet_weeks_table.c.week_id,
+        diet_weeks_table.c.cycle_id,
+        diet_weeks_table.c.common_data_id,
+        diet_weeks_table.c.week_start_date,
+        diet_weeks_table.c.calorie_target,
+        diet_weeks_table.c.created_at,
+        diet_weeks_table.c.updated_at
+    ])
+    result = db.execute(query).fetchall()
+    df = pd.DataFrame(result, columns=["week_id", "cycle_id", "common_data_id", "week_start_date", "calorie_target", "created_at", "updated_at"])
+    csv_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../data/diet_weeks.csv"))
+    df.to_csv(csv_path, index=False)
+
+def get_current_diet_cycle(db):
+    try:
+        query = """
+        SELECT cycle_id, common_data_id, start_date, end_date, cycle_type,
+               gain_rate_lbs_per_week, loss_rate_lbs_per_week, notes, created_at, updated_at
+        FROM diet_cycles
+        WHERE end_date IS NULL
+        ORDER BY start_date DESC
+        LIMIT 1
+        """
+        result = db.execute(query).fetchone()
+        return result
+    except Exception as e:
+        return None
 
 # Add corresponding functions for other queries in queries.py here
 # Example for sleep records (assuming you'll create these queries):

@@ -106,6 +106,17 @@ diet_cycles_table = Table(
     Column('updated_at', DateTime)
 )
 
+diet_weeks_table = Table(
+    'diet_weeks', metadata,
+    Column('week_id', Integer, primary_key=True, autoincrement=True),
+    Column('cycle_id', Integer, ForeignKey('diet_cycles.cycle_id'), nullable=False),
+    Column('common_data_id', Integer, ForeignKey('common_data.common_data_id'), nullable=False),  # Added column
+    Column('week_start_date', Date, nullable=False),
+    Column('calorie_target', Float),
+    Column('created_at', DateTime),
+    Column('updated_at', DateTime)
+)
+
 health_markers_table = Table(
     'health_markers', metadata,
     Column('health_marker_id', Integer, primary_key=True, autoincrement=True),

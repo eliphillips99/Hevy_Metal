@@ -14,7 +14,7 @@ from src.database.database_utils import *
 
 # Sidebar navigation
 st.sidebar.title("Navigation")
-page = st.sidebar.radio("Go to", ["Workouts", "Nutrition", "Sleep", "Health Markers", "Diet Cycles"])
+page = st.sidebar.radio("Go to", ["Workouts", "Nutrition", "Sleep", "Health Markers", "Diet Cycles", "Data Input"])
 
 # Create a database session
 db = next(get_db())
@@ -102,35 +102,25 @@ elif page == "Diet Cycles":
     st.title("Diet Cycles")
     diet_cycles = get_all_diet_cycles(db)
     if diet_cycles:
-        # Log the structure of the data for debugging
-
-        # Explicitly define the columns based on the schema structure
+        # Ensure the correct column names are applied
         column_names = [
-            "cycle_id", "start_date", "end_date", "cycle_type",
-            "gain_rate_lbs_per_week", "loss_rate_lbs_per_week", "notes",
-            "created_at", "updated_at", "source"  # Add any additional columns here
+            "Cycle ID", "Common Data ID", "Start Date", "End Date", "Cycle Type",
+            "Gain Rate (lbs/week)", "Loss Rate (lbs/week)", "Notes", "Created At", "Updated At"
         ]
         df_cycles = pd.DataFrame(diet_cycles, columns=column_names)
-        # Rename columns for display purposes
-        df_cycles.rename(columns={
-            "cycle_id": "Cycle ID",
-            "start_date": "Start Date",
-            "end_date": "End Date",
-            "cycle_type": "Cycle Type",
-            "gain_rate_lbs_per_week": "Gain Rate (lbs/week)",
-            "loss_rate_lbs_per_week": "Loss Rate (lbs/week)",
-            "notes": "Notes",
-            "created_at": "Created At",
-            "updated_at": "Updated At",
-            "source": "Source"  # Rename additional columns as needed
-        }, inplace=True)
+
+        # Reset the index to avoid an unnamed index column
+        df_cycles.reset_index(drop=True, inplace=True)
+
         st.dataframe(df_cycles)
     else:
         st.info("No diet cycle data found.")
 
-    st.sidebar.header("Manage Diet Cycles")
-    with st.sidebar.form("new_diet_cycle_form"):
-        st.subheader("Start New Diet Cycle")
+elif page == "Data Input":
+    st.title("Data Input")
+
+    st.header("Start New Diet Cycle")
+    with st.form("new_diet_cycle_form"):
         start_date = st.date_input("Start Date", date.today())
         cycle_type = st.selectbox("Cycle Type", ["bulk", "cut"])
         gain_rate = st.number_input("Gain Rate (lbs/week)", value=0.0, step=0.1)
@@ -140,20 +130,23 @@ elif page == "Diet Cycles":
         if submitted_start:
             result = insert_diet_cycle(db, start_date, cycle_type, notes=notes)
             st.success(result)
-            st.experimental_rerun()
+            st.experimental_set_query_params(page="Data Input")  # Refresh the page
 
-    with st.sidebar.form("end_current_cycle_form"):
-        st.subheader("End Current Diet Cycle")
-        current_cycle = get_current_diet_cycle(db)
-        if current_cycle:
-            cycle_id = current_cycle.cycle_id
-            end_date = st.date_input("End Date", date.today())
-            submitted_end = st.form_submit_button(f"End Cycle {cycle_id}")
-            if submitted_end:
-                result = end_diet_cycle(db, cycle_id, end_date)
+    st.header("Add Diet Week")
+    with st.form("add_diet_week_form"):
+        week_start_date = st.date_input("Week Start Date", date.today())
+        calorie_target = st.number_input("Calorie Target", value=0.0, step=1.0)
+        source = st.text_input("Source (optional)")
+        submitted_week = st.form_submit_button("Add Week")
+        if submitted_week:
+            # Fetch the most recent ongoing cycle
+            current_cycle = get_current_diet_cycle(db)
+            if current_cycle:
+                cycle_id = current_cycle.cycle_id
+                result = insert_diet_week(db, week_start_date, calorie_target, cycle_id, source=source)
                 st.success(result)
-                st.experimental_rerun()
-        else:
-            st.info("No current diet cycle recorded.")
+                st.experimental_set_query_params(page="Data Input")  # Refresh the page
+            else:
+                st.error("No ongoing diet cycle found. Please start a new cycle first.")
 
 db.close()

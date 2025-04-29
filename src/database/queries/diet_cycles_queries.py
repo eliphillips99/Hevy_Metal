@@ -1,5 +1,6 @@
 from sqlalchemy import select, and_, or_
 from src.database.schema import diet_cycles_table
+from src.database.schema import diet_weeks_table
 
 def insert_diet_cycle_query(start_date, cycle_type, end_date=None, notes=None):
     return diet_cycles_table.insert().values(
@@ -39,3 +40,13 @@ def get_all_diet_cycles_query(start_date=None, end_date=None):
             conditions.append(diet_cycles_table.c.start_date <= end_date)
         query = query.where(and_(*conditions))
     return query
+
+def insert_diet_week_query(diet_cycle_id, week_start_date, calorie_target):
+    return diet_weeks_table.insert().values(
+        diet_cycle_id=diet_cycle_id,
+        week_start_date=week_start_date,
+        calorie_target=calorie_target
+    )
+
+def get_diet_weeks_query(diet_cycle_id):
+    return select(diet_weeks_table).where(diet_weeks_table.c.diet_cycle_id == diet_cycle_id)
