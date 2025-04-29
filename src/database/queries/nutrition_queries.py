@@ -3,7 +3,6 @@ from src.database.schema import nutrition_data_table, common_data  # Use the cor
 
 def get_nutrition_data_query(start_date=None, end_date=None):
     # Debugging: Log the input parameters
-    print(f"get_nutrition_data_query called with start_date={start_date}, end_date={end_date}")
 
     # Join nutrition_data_table with common_data to filter by date
     query = select(
@@ -23,9 +22,5 @@ def get_nutrition_data_query(start_date=None, end_date=None):
         if end_date:
             conditions.append(common_data.c.date <= end_date)
         query = query.where(and_(*conditions))
-
-    # Debugging: Log the generated query
-    print("Generated Nutrition Data Query:")
-    print(query)
 
     return query
