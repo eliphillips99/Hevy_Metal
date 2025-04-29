@@ -102,8 +102,8 @@ diet_cycles_table = Table(
     Column('gain_rate_lbs_per_week', Float),
     Column('loss_rate_lbs_per_week', Float),
     Column('notes', String),
-    Column('created_at', DateTime),  # Added for consistency
-    Column('updated_at', DateTime)  # Added for consistency
+    Column('created_at', DateTime),
+    Column('updated_at', DateTime)
 )
 
 health_markers_table = Table(
