@@ -1,10 +1,12 @@
 from sqlalchemy import select, and_
-from src.database.schema import health_markers_table, common_data  # Use the correct table name
+from sqlalchemy.orm import Session
+from src.database.schema import health_markers_table, common_data
+from src.database.connection import engine  # Assuming `engine` is defined in a connection module
 
-def get_health_markers_query(start_date=None, end_date=None):
-    # Debugging: Log the input parameters
-    print(f"get_health_markers_query called with start_date={start_date}, end_date={end_date}")
+# Initialize the database session
+db = Session(bind=engine)
 
+def query_get_health_markers(start_date=None, end_date=None):
     # Join health_markers_table with common_data to filter by date
     query = select(
         common_data.c.date.label("Date"),
@@ -28,8 +30,4 @@ def get_health_markers_query(start_date=None, end_date=None):
             conditions.append(common_data.c.date <= end_date)
         query = query.where(and_(*conditions))
 
-    # Debugging: Log the generated query
-    print("Generated Health Markers Query:")
-    print(query)
-
-    return query
+    return db.execute(query).fetchall()

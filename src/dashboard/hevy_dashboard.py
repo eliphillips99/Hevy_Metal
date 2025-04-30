@@ -140,7 +140,8 @@ elif page == "Data Input":
         submitted_week = st.form_submit_button("Add Week")
         if submitted_week:
             # Fetch the most recent ongoing cycle
-            current_cycle = get_current_diet_cycle(db)
+            current_cycle = get_current_diet_cycle(week_start_date)
+            print("Debug: Current Cycle", current_cycle)  # Debugging line
             if current_cycle:
                 cycle_id = current_cycle.cycle_id
                 result = insert_diet_week(db, week_start_date, calorie_target, cycle_id, source=source)

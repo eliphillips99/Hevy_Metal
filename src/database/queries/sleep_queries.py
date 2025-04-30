@@ -1,9 +1,14 @@
 from sqlalchemy import select, and_
+from sqlalchemy.orm import Session
 from src.database.schema import sleep_data_table, common_data
+from src.database.connection import engine  # Assuming `engine` is defined in a connection module
 
-def get_sleep_data_query(start_date=None, end_date=None):
+# Initialize the database session
+db = Session(bind=engine)
+
+def query_get_sleep_data(start_date=None, end_date=None):
     # Debugging: Log the input parameters
-    print(f"get_sleep_data_query called with start_date={start_date}, end_date={end_date}")
+    print(f"query_get_sleep_data called with start_date={start_date}, end_date={end_date}")
 
     # Join sleep_data_table with common_data to include the source column
     query = select(
@@ -37,4 +42,4 @@ def get_sleep_data_query(start_date=None, end_date=None):
     print("Generated Sleep Data Query:")
     print(query)
 
-    return query
+    return db.execute(query).fetchall()

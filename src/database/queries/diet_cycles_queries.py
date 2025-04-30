@@ -1,36 +1,48 @@
 from sqlalchemy import select, and_, or_
-from src.database.schema import diet_cycles_table
-from src.database.schema import diet_weeks_table
+from sqlalchemy.orm import Session
+from src.database.schema import diet_cycles_table, diet_weeks_table
+from src.database.connection import engine  # Assuming `engine` is defined in a connection module
 
-def insert_diet_cycle_query(start_date, cycle_type, end_date=None, notes=None):
-    return diet_cycles_table.insert().values(
-        start_date=start_date,
-        end_date=end_date,
-        cycle_type=cycle_type,
-        notes=notes
+# Initialize the database session
+db = Session(bind=engine)
+
+def query_insert_diet_cycle(start_date, cycle_type, end_date=None, notes=None):
+    return db.execute(
+        diet_cycles_table.insert().values(
+            start_date=start_date,
+            end_date=end_date,
+            cycle_type=cycle_type,
+            notes=notes
+        )
     )
 
-def update_diet_cycle_end_date_query(cycle_id, end_date):
-    return diet_cycles_table.update().where(
-        diet_cycles_table.c.cycle_id == cycle_id
-    ).values(end_date=end_date)
+def query_update_diet_cycle_end_date(cycle_id, end_date):
+    return db.execute(
+        diet_cycles_table.update().where(
+            diet_cycles_table.c.cycle_id == cycle_id
+        ).values(end_date=end_date)
+    )
 
-def get_current_diet_cycle_query(on_date=None):
-    if on_date:
-        return select(diet_cycles_table).where(
-            and_(
-                diet_cycles_table.c.start_date <= on_date,
-                or_(
-                    diet_cycles_table.c.end_date >= on_date,
-                    diet_cycles_table.c.end_date == None
-                )
-            )
-        )
-    return select(diet_cycles_table).where(
-        diet_cycles_table.c.end_date == None
+def query_get_current_diet_cycle(reference_date=None):
+    """
+    Fetch the most recent ongoing diet cycle.
+    :param reference_date: Optional. The date to check for an active cycle. Defaults to today.
+    :return: Query result.
+    """
+    if reference_date is None:
+        reference_date = date.today()
+
+    query = select(diet_cycles_table).where(
+        or_(
+            diet_cycles_table.c.end_date == None,
+            diet_cycles_table.c.end_date >= reference_date
+        ),
+        diet_cycles_table.c.start_date <= reference_date
     ).order_by(diet_cycles_table.c.start_date.desc()).limit(1)
 
-def get_all_diet_cycles_query(start_date=None, end_date=None):
+    return db.execute(query).fetchone()
+
+def query_get_all_diet_cycles(start_date=None, end_date=None):
     query = select(diet_cycles_table).order_by(diet_cycles_table.c.start_date.desc())
     if start_date or end_date:
         conditions = []
@@ -39,14 +51,17 @@ def get_all_diet_cycles_query(start_date=None, end_date=None):
         if end_date:
             conditions.append(diet_cycles_table.c.start_date <= end_date)
         query = query.where(and_(*conditions))
-    return query
+    return db.execute(query).fetchall()
 
-def insert_diet_week_query(diet_cycle_id, week_start_date, calorie_target):
-    return diet_weeks_table.insert().values(
-        diet_cycle_id=diet_cycle_id,
-        week_start_date=week_start_date,
-        calorie_target=calorie_target
+def query_insert_diet_week(diet_cycle_id, week_start_date, calorie_target):
+    return db.execute(
+        diet_weeks_table.insert().values(
+            diet_cycle_id=diet_cycle_id,
+            week_start_date=week_start_date,
+            calorie_target=calorie_target
+        )
     )
 
-def get_diet_weeks_query(diet_cycle_id):
-    return select(diet_weeks_table).where(diet_weeks_table.c.diet_cycle_id == diet_cycle_id)
+def query_get_diet_weeks(diet_cycle_id):
+    query = select(diet_weeks_table).where(diet_weeks_table.c.diet_cycle_id == diet_cycle_id)
+    return db.execute(query).fetchall()
