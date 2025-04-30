@@ -1,4 +1,11 @@
-common_data_id,week_id,cycle_id,week_start_date,calorie_target,created_at,updated_at
+week_id,cycle_id,common_data_id,week_start_date,calorie_target,common_data_date,common_data_source
+1,6,3110,4/27/25,3577,4/27/25,
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
+,,,,,,
 ,,,,,,
 ,,,,,,
 ,,,,,,

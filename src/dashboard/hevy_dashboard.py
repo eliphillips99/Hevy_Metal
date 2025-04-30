@@ -32,6 +32,10 @@ from src.database.connection import engine
 # Create a database session
 db = Session(bind=engine)
 
+def set_query_params(**params):
+    """Helper function to set query parameters."""
+    st.experimental_set_query_params(**params)  # Use experimental method for now
+
 # Sidebar navigation
 st.sidebar.title("Navigation")
 page = st.sidebar.radio("Go to", ["Workouts", "Nutrition", "Sleep", "Health Markers", "Diet Cycles", "Data Input"])
@@ -122,7 +126,7 @@ elif page == "Data Input":
         if submitted_start:
             query_insert_diet_cycle(start_date, cycle_type, notes=notes)
             st.success("Diet cycle added successfully.")
-            st.experimental_set_query_params(page="Data Input")  # Refresh the page
+            set_query_params(page="Data Input")  # Use helper function
 
     st.header("Add Diet Week")
     with st.form("add_diet_week_form"):
@@ -136,7 +140,7 @@ elif page == "Data Input":
                 cycle_id = current_cycle.cycle_id
                 query_insert_diet_week(cycle_id, week_start_date, calorie_target)
                 st.success("Diet week added successfully.")
-                st.experimental_set_query_params(page="Data Input")  # Refresh the page
+                set_query_params(page="Data Input")  # Use helper function
             else:
                 st.error("No ongoing diet cycle found. Please start a new cycle first.")
 
