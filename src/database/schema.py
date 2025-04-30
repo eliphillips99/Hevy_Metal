@@ -1,5 +1,6 @@
 # workout-analytics/database_schema.py
 from sqlalchemy import MetaData, Table, Column, Integer, String, Float, DateTime, Date, ForeignKey
+from src.database.connection import engine
 
 metadata = MetaData()
 
@@ -144,3 +145,6 @@ data_table = Table(
     Column('created_at', DateTime),
     Column('updated_at', DateTime)
 )
+
+# Recreate the database schema
+metadata.create_all(engine)
