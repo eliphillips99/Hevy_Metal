@@ -9,6 +9,8 @@ import os  # Import os for file path operations
 # Initialize the database session
 db = Session(bind=engine)
 
+print('test')
+
 def query_insert_diet_cycle(start_date, cycle_type, end_date=None, notes=None):
     return db.execute(
         diet_cycles_table.insert().values(
