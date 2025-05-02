@@ -1,5 +1,6 @@
 # workout-analytics/database_schema.py
 from sqlalchemy import MetaData, Table, Column, Integer, String, Float, DateTime, Date, ForeignKey
+from src.database.connection import engine
 
 metadata = MetaData()
 
@@ -55,20 +56,20 @@ metrics = Table('metrics', metadata,
     Column('category', String, nullable=False)
 )
 
-
-sleep_data_table = Table('sleep_data', metadata,
+sleep_data_table = Table(
+    'sleep_data', metadata,
     Column('sleep_data_id', Integer, primary_key=True, autoincrement=True),
     Column('common_data_id', Integer, ForeignKey('common_data.common_data_id'), nullable=False),
     Column('start_time', DateTime, nullable=False),
     Column('end_time', DateTime, nullable=False),
-    Column('in_bed_duration_hours', Float),  # inBed from JSON
-    Column('sleep_duration_hours', Float), # asleep from JSON
-    Column('awake_duration_hours', Float),  # awake from JSON
-    Column('rem_sleep_duration_hours', Float),    # rem from JSON
-    Column('deep_sleep_duration_hours', Float),   # deep from JSON
-    Column('core_sleep_duration_hours', Float), # core from JSON
-    Column('in_bed_start', DateTime), 
-    Column('in_bed_end', DateTime),   
+    Column('in_bed_duration_hours', Float),
+    Column('sleep_duration_hours', Float),
+    Column('awake_duration_hours', Float),
+    Column('rem_sleep_duration_hours', Float),
+    Column('deep_sleep_duration_hours', Float),
+    Column('core_sleep_duration_hours', Float),  # Ensure this field exists
+    Column('in_bed_start', DateTime),  # Ensure this field exists
+    Column('in_bed_end', DateTime),  # Ensure this field exists
     Column('created_at', DateTime),
     Column('updated_at', DateTime)
 )
@@ -99,9 +100,22 @@ diet_cycles_table = Table(
     Column('start_date', Date, nullable=False),
     Column('end_date', Date),
     Column('cycle_type', String, nullable=False),
+    Column('gain_rate_lbs_per_week', Float),
+    Column('loss_rate_lbs_per_week', Float),
     Column('notes', String),
-    Column('created_at', DateTime),  # Added for consistency
-    Column('updated_at', DateTime)  # Added for consistency
+    Column('created_at', DateTime),
+    Column('updated_at', DateTime)
+)
+
+diet_weeks_table = Table(
+    'diet_weeks', metadata,
+    Column('week_id', Integer, primary_key=True, autoincrement=True),
+    Column('cycle_id', Integer, ForeignKey('diet_cycles.cycle_id'), nullable=False),
+    Column('common_data_id', Integer, ForeignKey('common_data.common_data_id'), nullable=False),  # Added column
+    Column('week_start_date', Date, nullable=False),
+    Column('calorie_target', Float),
+    Column('created_at', DateTime),
+    Column('updated_at', DateTime)
 )
 
 health_markers_table = Table(
@@ -131,3 +145,6 @@ data_table = Table(
     Column('created_at', DateTime),
     Column('updated_at', DateTime)
 )
+
+# Recreate the database schema
+metadata.create_all(engine)
