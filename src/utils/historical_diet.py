@@ -4,28 +4,10 @@ from datetime import datetime
 import os
 import uuid  # Add this import for generating unique IDs
 from dateutil.parser import parse  # Add this import for flexible date parsing
+from src.database.database_utils import get_or_create_common_data_id
 
 # Path to your SQLite database
 DATABASE_NAME = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../data/hevy_metal.db"))
-
-def get_or_create_common_data_id(cursor, date, source="diet_cycles"):
-    """
-    Get or create a common_data_id for a given date and source.
-    """
-    date_str = date.strftime("%Y-%m-%d %H:%M:%S") if isinstance(date, datetime) else date
-    cursor.execute("""
-        SELECT common_data_id FROM common_data WHERE date = ? AND source = ?
-    """, (date_str, source))
-    result = cursor.fetchone()
-    if result:
-        return result[0]
-    
-    # Insert new common_data entry
-    cursor.execute("""
-        INSERT INTO common_data (date, source)
-        VALUES (?, ?)
-    """, (date_str, source))
-    return cursor.lastrowid
 
 # Function to import diet cycles from a CSV file
 def import_diet_cycles_from_csv(csv_file_path):

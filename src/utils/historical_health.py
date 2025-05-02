@@ -6,6 +6,7 @@ from datetime import date
 from sqlalchemy import func
 from src.database.schema import health_markers_table, common_data
 from sqlalchemy.orm import Session
+from src.database.database_utils import get_or_create_common_data_id
 
 DATABASE_NAME = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../data/hevy_metal.db"))
 JSON_FILE_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../data/HealthAutoExport-2023-06-17-2025-04-26.json"))
@@ -31,26 +32,6 @@ METRIC_NAME_MAPPING = {
     "blood_oxygen_saturation": "blood_oxygen_saturation",
     "body_mass_index": "body_mass_index"
 }
-
-def get_or_create_common_data_id(cursor, date, source):
-    """
-    Get or create a common_data_id for a given date and source.
-    """
-    # Ensure date is stored as a string
-    date_str = date.strftime("%Y-%m-%d %H:%M:%S %z") if isinstance(date, datetime) else date
-    cursor.execute("""
-        SELECT common_data_id FROM common_data WHERE date = ? AND source = ?
-    """, (date_str, source))
-    result = cursor.fetchone()
-    if result:
-        return result[0]
-    
-    # Insert new common_data entry
-    cursor.execute("""
-        INSERT INTO common_data (date, source)
-        VALUES (?, ?)
-    """, (date_str, source))
-    return cursor.lastrowid
 
 def get_or_create_metric_id(cursor, metric_name, units, category="general"):
     """
