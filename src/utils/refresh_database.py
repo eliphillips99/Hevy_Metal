@@ -4,6 +4,7 @@ import sys
 import os
 import json
 
+
 # Dynamically add the project root to sys.path
 current_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.abspath(os.path.join(current_dir, "../../"))
@@ -19,36 +20,42 @@ DATABASE_NAME = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../d
 HEALTH_JSON_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../data/HealthAutoExport-2023-06-17-2025-04-26.json"))
 DIET_CYCLES_CSV_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../data/diet_cycles.csv"))
 
+# Define the engine as a global variable
+engine = create_engine(f"sqlite:///{DATABASE_NAME}")  # Use SQLAlchemy engine
+
 def create_new_database():
     """Creates a new SQLite database and applies the schema."""
     print("Creating a new database...")
-    engine = create_engine(f"sqlite:///{DATABASE_NAME}")  # Use SQLAlchemy engine
     metadata.create_all(bind=engine)  # Use SQLAlchemy metadata to create tables
     print("Database schema creation complete.")
 
 def refresh_database():
-    # Step 1: Delete the existing database file
+    # Step 1: Dispose of the engine to ensure all connections are closed
+    global engine
+    engine.dispose()
+
+    # Step 2: Delete the existing database file
     if os.path.exists(DATABASE_NAME):
         print(f"Deleting existing database: {DATABASE_NAME}")
         os.remove(DATABASE_NAME)
     else:
         print("No existing database found. Proceeding to create a new one.")
 
-    # Step 2: Create a new database and apply the schema
+    # Step 3: Create a new database and apply the schema
     create_new_database()
 
-    # Step 3: Populate the database with Hevy workout data
+    # Step 4: Populate the database with Hevy workout data
     print("Populating database with Hevy workout data...")
     populate_hevy_data()
 
-    # Step 4: Populate the database with historical health data
+    # Step 5: Populate the database with historical health data
     if os.path.exists(HEALTH_JSON_FILE):
         print("Populating database with historical health data...")
         import_historical_data(HEALTH_JSON_FILE)
     else:
         print(f"Health JSON file not found: {HEALTH_JSON_FILE}. Skipping health data import.")
 
-    # Step 5: Populate the database with diet cycle data
+    # Step 6: Populate the database with diet cycle data
     if os.path.exists(DIET_CYCLES_CSV_FILE):
         print("Populating database with diet cycle data...")
         import_diet_cycles_from_csv(DIET_CYCLES_CSV_FILE)
