@@ -1,5 +1,5 @@
 # workout-analytics/database_schema.py
-from sqlalchemy import MetaData, Table, Column, Integer, String, Float, DateTime, Date, ForeignKey
+from sqlalchemy import MetaData, Table, Column, Integer, String, Float, DateTime, Date, ForeignKey, UniqueConstraint
 from src.database.connection import engine
 
 metadata = MetaData()
@@ -8,6 +8,7 @@ common_data = Table('common_data', metadata,
     Column('common_data_id', Integer, primary_key=True),
     Column('date', DateTime, nullable=False),
     Column('source', String),
+    UniqueConstraint('date', 'source', name='uq_date_source')
 )
 
 workouts_table = Table('workouts', metadata,
