@@ -3,6 +3,9 @@ import json
 import sqlite3
 from datetime import datetime
 from datetime import date
+from sqlalchemy import func
+from src.database.schema import health_markers_table, common_data
+from sqlalchemy.orm import Session
 
 DATABASE_NAME = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../data/hevy_metal.db"))
 JSON_FILE_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../data/HealthAutoExport-2023-06-17-2025-04-26.json"))
@@ -252,29 +255,32 @@ def pull_nutrition_from_json(metric_data, metric_name, cursor, nutrition_data_gr
             ))
 
 def pull_markers_from_json(metric_data, metric_name, cursor, markers_data_grouped):
-     for entry in metric_data:
-                date = entry.get("date")
-                qty = entry.get("qty")
-                source = entry.get("source", "Unknown")
+    for entry in metric_data:
+        date = entry.get("date")
+        qty = entry.get("qty")
+        source = entry.get("source", "Unknown")
 
-                # Group nutrition data by date and source
-                key = (date, source)
-                #print(f"Grouping Key: {key}, Metric Name: {metric_name}, Qty: {qty}")
-                if key not in markers_data_grouped:
-                    markers_data_grouped[key] = {
-                        "time_in_daylight": None,
-                        "vo2_max": None,
-                        "heart_rate": None,
-                        "heart_rate_variability": None,
-                        "resting_heart_rate": None,
-                        "respiratory_rate": None,
-                        "blood_oxygen_saturation": None,
-                        "body_weight_lbs": None,
-                        "body_mass_index": None,
-                    }
-                markers_data_grouped[key][metric_name] = qty
-        
-     for (date, source), marker_values in markers_data_grouped.items():
+        # Group health marker data by date and source
+        key = (date, source)
+        if key not in markers_data_grouped:
+            markers_data_grouped[key] = {
+                "time_in_daylight": None,
+                "vo2_max": None,
+                "heart_rate": None,
+                "heart_rate_variability": None,
+                "resting_heart_rate": None,
+                "respiratory_rate": None,
+                "blood_oxygen_saturation": None,
+                "body_weight_lbs": None,
+                "body_mass_index": None,
+            }
+        markers_data_grouped[key][metric_name] = qty
+
+    for (date, source), marker_values in markers_data_grouped.items():
+        # Skip entries where all marker values are None
+        if all(value is None for value in marker_values.values()):
+            continue
+
         time_in_daylight = marker_values.get("time_in_daylight")
         vo2_max = marker_values.get("vo2_max")
         heart_rate = marker_values.get("heart_rate")
@@ -284,11 +290,6 @@ def pull_markers_from_json(metric_data, metric_name, cursor, markers_data_groupe
         blood_oxygen_saturation = marker_values.get("blood_oxygen_saturation")
         body_weight_lbs = marker_values.get("body_weight_lbs")
         body_mass_index = marker_values.get("body_mass_index")
-
-
-        #print(f"Processing grouped nutrition entry: Date: {date}, Body Weight: {body_weight_lbs}")
-
-        #print(vo2_max, heart_rate, heart_rate_variability, resting_heart_rate, respiratory_rate, blood_oxygen_saturation, body_weight_lbs, body_mass_index)
 
         # Convert date to a datetime object
         try:
@@ -300,11 +301,10 @@ def pull_markers_from_json(metric_data, metric_name, cursor, markers_data_groupe
         # Get or create the common_data_id
         common_data_id = get_or_create_common_data_id(cursor, timestamp, source)
 
+        # Check if a row already exists for this common_data_id
         cursor.execute("""
-        SELECT 1 FROM health_markers
-        WHERE common_data_id = ? AND body_weight_lbs = ? AND time_in_daylight_min = ?
-        """, (common_data_id, body_weight_lbs, time_in_daylight))
-
+        SELECT 1 FROM health_markers WHERE common_data_id = ?
+        """, (common_data_id,))
         if cursor.fetchone() is None:
             # Insert a new row
             cursor.execute("""
@@ -421,6 +421,63 @@ def import_historical_data(json_file_path, target_date=None):
     # Close the connection
     conn.close()
     print("Data import complete.")
+
+def import_historical_health_data(session: Session, health_data: list):
+    """
+    Imports historical health data into the database, aggregating by date.
+    :param session: SQLAlchemy session object.
+    :param health_data: List of health marker records to import.
+    """
+    # Step 1: Aggregate data by date
+    aggregated_data = {}
+    for record in health_data:
+        date = record["date"]
+        if date not in aggregated_data:
+            aggregated_data[date] = {
+                "heart_rate": [],
+                "vo2_max": [],
+                "body_weight_lbs": [],
+                "body_mass_index": [],
+                "respiratory_rate": [],
+                "blood_oxygen_saturation": []
+            }
+        for key in aggregated_data[date]:
+            if record.get(key) is not None:
+                aggregated_data[date][key].append(record[key])
+
+    # Step 2: Calculate averages for each date
+    for date, metrics in aggregated_data.items():
+        aggregated_data[date] = {
+            "date": date,
+            "heart_rate": sum(metrics["heart_rate"]) / len(metrics["heart_rate"]) if metrics["heart_rate"] else None,
+            "vo2_max": sum(metrics["vo2_max"]) / len(metrics["vo2_max"]) if metrics["vo2_max"] else None,
+            "body_weight_lbs": sum(metrics["body_weight_lbs"]) / len(metrics["body_weight_lbs"]) if metrics["body_weight_lbs"] else None,
+            "body_mass_index": sum(metrics["body_mass_index"]) / len(metrics["body_mass_index"]) if metrics["body_mass_index"] else None,
+            "respiratory_rate": sum(metrics["respiratory_rate"]) / len(metrics["respiratory_rate"]) if metrics["respiratory_rate"] else None,
+            "blood_oxygen_saturation": sum(metrics["blood_oxygen_saturation"]) / len(metrics["blood_oxygen_saturation"]) if metrics["blood_oxygen_saturation"] else None,
+        }
+
+    # Step 3: Insert aggregated data into the database
+    for date, metrics in aggregated_data.items():
+        # Insert into common_data table
+        common_data_id = session.execute(
+            common_data.insert().values(date=metrics["date"]).returning(common_data.c.common_data_id)
+        ).scalar()
+
+        # Insert into health_markers_table
+        session.execute(
+            health_markers_table.insert().values(
+                common_data_id=common_data_id,
+                heart_rate=metrics["heart_rate"],
+                vo2_max=metrics["vo2_max"],
+                body_weight_lbs=metrics["body_weight_lbs"],
+                body_mass_index=metrics["body_mass_index"],
+                respiratory_rate=metrics["respiratory_rate"],
+                blood_oxygen_saturation=metrics["blood_oxygen_saturation"]
+            )
+        )
+
+    session.commit()
 
 if __name__ == "__main__":
     # Import historical data

@@ -2,6 +2,7 @@ import os
 from sqlalchemy import create_engine
 import sys
 import os
+import json
 
 # Dynamically add the project root to sys.path
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -11,10 +12,12 @@ if project_root not in sys.path:
 
 from src.utils.historical_hevy import main as populate_hevy_data
 from src.utils.historical_health import import_historical_data
+from src.utils.historical_diet import import_diet_cycles_from_csv
 from src.database.schema import metadata
 
 DATABASE_NAME = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../data/hevy_metal.db"))
 HEALTH_JSON_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../data/HealthAutoExport-2023-06-17-2025-04-26.json"))
+DIET_CYCLES_CSV_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../data/diet_cycles.csv"))
 
 def create_new_database():
     """Creates a new SQLite database and applies the schema."""
@@ -44,6 +47,13 @@ def refresh_database():
         import_historical_data(HEALTH_JSON_FILE)
     else:
         print(f"Health JSON file not found: {HEALTH_JSON_FILE}. Skipping health data import.")
+
+    # Step 5: Populate the database with diet cycle data
+    if os.path.exists(DIET_CYCLES_CSV_FILE):
+        print("Populating database with diet cycle data...")
+        import_diet_cycles_from_csv(DIET_CYCLES_CSV_FILE)
+    else:
+        print(f"Diet cycles CSV file not found: {DIET_CYCLES_CSV_FILE}. Skipping diet cycle data import.")
 
     print("Database refresh complete.")
 
