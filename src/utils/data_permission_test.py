@@ -86,3 +86,5 @@ if os.path.exists(DATABASE_NAME):
         print("File deleted successfully.")
     except PermissionError as e:
         print(f"Error deleting file: {e}")
+
+
