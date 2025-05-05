@@ -4,7 +4,7 @@ import sqlite3
 import json
 from datetime import datetime
 from dotenv import load_dotenv
-from src.database.database_utils import get_or_create_common_data_id
+from database.database_utils import get_or_create_common_data_id
 
 load_dotenv()
 HEVY_API_KEY = os.getenv("HEVY_API_KEY")

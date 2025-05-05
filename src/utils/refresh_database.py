@@ -1,15 +1,15 @@
 import os
 import sys
-from sqlalchemy import create_engine, MetaData, NullPool
+from sqlalchemy import create_engine, MetaData, NullPool, text
 import json
 import time
 
 # Remove dynamic sys.path modification
 # Assume the script is run with the correct working directory or PYTHONPATH
 
-from src.utils.historical_hevy import main as populate_hevy_data
-from src.utils.historical_health import import_historical_data
-from src.utils.historical_diet import import_diet_cycles_from_csv
+from utils.historical_hevy import main as populate_hevy_data
+from utils.historical_health import import_historical_data
+from utils.historical_diet import import_diet_cycles_from_csv
 from src.database.schema import metadata
 
 DATABASE_NAME = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../data/hevy_metal.db"))
@@ -22,7 +22,6 @@ def initialize():
     engine = create_engine(f"sqlite:///{DATABASE_NAME}")
 
     # Perform a minimal operation
-    metadata = MetaData()
     metadata.create_all(bind=engine)
 
     # Dispose of the engine
@@ -41,7 +40,9 @@ def initialize():
     # Create a new database
     print("Creating a new database...")
     engine = create_engine(f"sqlite:///{DATABASE_NAME}", poolclass=NullPool)
-    metadata.create_all(bind=engine)
+    with engine.connect() as connection:
+        # Create all tables based on the schema
+        metadata.create_all(bind=connection)
     engine.dispose()  # Dispose of the engine after creation
     time.sleep(1)  # Ensure connections are closed
     print("Database schema creation complete.")
