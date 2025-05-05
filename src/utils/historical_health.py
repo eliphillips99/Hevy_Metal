@@ -54,7 +54,7 @@ def get_or_create_metric_id(cursor, metric_name, units, category="general"):
 def insert_raw_data(cursor, metric_name, metric_units, metric_data):
     metric_id = get_or_create_metric_id(cursor, metric_name, metric_units)
 
-    print(f"Processing metric: {metric_name}, Units: {metric_units}, Entries: {len(metric_data)}")
+    #print(f"Processing metric: {metric_name}, Units: {metric_units}, Entries: {len(metric_data)}")
 
 
     for entry in metric_data:
@@ -345,7 +345,7 @@ def import_daily_data(data, conn):
         metric_data = metric.get("data", [])
         # Translate metric name using the mapping
         metric_name = METRIC_NAME_MAPPING.get(metric_name, metric_name)
-        print(f"Mapped Metric Name: {metric_name}, Original Name: {metric.get('name')}")
+        #print(f"Mapped Metric Name: {metric_name}, Original Name: {metric.get('name')}")
         insert_raw_data(cursor, metric_name, metric_units, metric_data)
         # Handle sleep_analysis specifically
         if metric_name == "sleep_analysis":
