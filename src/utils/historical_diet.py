@@ -51,9 +51,9 @@ def import_diet_cycles_from_csv(csv_file_path, source="diet_cycles"):
             cursor.execute("""
                 INSERT INTO diet_cycles (
                     common_data_id, start_date, end_date, cycle_type, gain_rate_lbs_per_week,
-                    loss_rate_lbs_per_week, notes, created_at, updated_at
+                    loss_rate_lbs_per_week, notes, source, created_at, updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 common_data_id,
                 start_date,
@@ -62,6 +62,7 @@ def import_diet_cycles_from_csv(csv_file_path, source="diet_cycles"):
                 row.get("gain_rate_lbs_per_week"),
                 row.get("loss_rate_lbs_per_week"),
                 row.get("notes"),
+                source,  # Ensure source is populated
                 datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             ))
@@ -106,7 +107,7 @@ def import_diet_weeks_from_csv(csv_file_path, source="diet_weeks_csv"):
                 cycle_id,
                 common_data_id,
                 week_id,
-                source,
+                source,  # Ensure source is populated
                 week_start_date,
                 calorie_target,
                 datetime.now().strftime("%Y-%m-%d %H:%M:%S"),

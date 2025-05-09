@@ -118,9 +118,10 @@ def query_insert_diet_week(cycle_id, week_start_date, calorie_target, source=Non
         db.execute(
             diet_weeks_table.insert().values(
                 cycle_id=cycle_id,
-                common_data_id=common_data_id,  # Include the generated common_data_id
+                common_data_id=common_data_id,
                 week_start_date=week_start_date,
                 calorie_target=calorie_target,
+                source=source,  # Ensure source is populated
                 created_at=current_time,
                 updated_at=current_time
             )
@@ -128,7 +129,7 @@ def query_insert_diet_week(cycle_id, week_start_date, calorie_target, source=Non
         db.commit()  # Ensure changes are committed to the database
 
         # Debugging: Log successful insertion
-        print(f"Debug: Inserted diet week with cycle_id={cycle_id}, week_start_date={week_start_date}, calorie_target={calorie_target}.")
+        print(f"Debug: Inserted diet week with cycle_id={cycle_id}, week_start_date={week_start_date}, calorie_target={calorie_target}, source={source}.")
 
         # Update the diet_weeks.csv file
         update_diet_weeks_csv()

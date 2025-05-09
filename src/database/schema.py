@@ -103,6 +103,7 @@ diet_cycles_table = Table(
     Column('cycle_type', String, nullable=False),
     Column('gain_rate_lbs_per_week', Float),
     Column('loss_rate_lbs_per_week', Float),
+    Column('source', String),
     Column('notes', String),
     Column('created_at', DateTime),
     Column('updated_at', DateTime)

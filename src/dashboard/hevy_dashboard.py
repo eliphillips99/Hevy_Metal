@@ -38,7 +38,7 @@ db = Session(bind=engine)
 
 def set_query_params(**params):
     """Helper function to set query parameters."""
-    st.experimental_set_query_params(**params)  # Use experimental method for now
+    st.query_params(**params)  # Updated to use st.query_params
 
 '''def append_to_diet_weeks_csv(cycle_id, week_id, week_start_date, calorie_target, source):
     """Append a new diet week to the CSV file."""
@@ -155,14 +155,24 @@ elif page == "Data Input":
             current_cycle = query_get_current_diet_cycle()
             if current_cycle:
                 cycle_id = current_cycle.cycle_id
-                query_insert_diet_week(
-                    cycle_id=cycle_id,
-                    week_start_date=week_start_date,
-                    calorie_target=calorie_target,
-                    source=source  # Ensure source is passed
-                )
-                st.success("Diet week added successfully.")
-                set_query_params(page="Data Input")  # Use helper function
+
+                # Check if the common_data entry already exists
+                existing_common_data = db.execute(
+                    "SELECT common_data_id FROM common_data WHERE date = :date AND source = :source",
+                    {"date": week_start_date.strftime("%Y-%m-%d %H:%M:%S"), "source": source}
+                ).fetchone()
+
+                if existing_common_data:
+                    st.error("A diet week with the same date and source already exists.")
+                else:
+                    query_insert_diet_week(
+                        cycle_id=cycle_id,
+                        week_start_date=week_start_date,
+                        calorie_target=calorie_target,
+                        source=source
+                    )
+                    st.success("Diet week added successfully.")
+                    set_query_params(page="Data Input")  # Use helper function
             else:
                 st.error("No ongoing diet cycle found. Please start a new cycle first.")
 
