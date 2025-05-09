@@ -17,35 +17,28 @@ HEALTH_JSON_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.
 DIET_CYCLES_CSV_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../data/diet_cycles.csv"))
 
 def initialize():
-    """Initialize the database by deleting the old one and creating a new one."""
-    # Create an engine
-    engine = create_engine(f"sqlite:///{DATABASE_NAME}")
-
-    # Perform a minimal operation
-    metadata.create_all(bind=engine)
-
-    # Dispose of the engine
-    engine.dispose()
-    time.sleep(1)  # Ensure connections are closed
-
-    # Attempt to delete the file
+    """Initialize the database by clearing the existing one."""
+    # Check if the database file exists
     if os.path.exists(DATABASE_NAME):
-        try:
-            os.remove(DATABASE_NAME)
-            print("File deleted successfully.")
-        except PermissionError as e:
-            print(f"Error deleting file: {e}")
-            return  # Exit if the file cannot be deleted
-
-    # Create a new database
-    print("Creating a new database...")
-    engine = create_engine(f"sqlite:///{DATABASE_NAME}", poolclass=NullPool)
-    with engine.connect() as connection:
-        # Create all tables based on the schema
-        metadata.create_all(bind=connection)
-    engine.dispose()  # Dispose of the engine after creation
-    time.sleep(1)  # Ensure connections are closed
-    print("Database schema creation complete.")
+        print(f"Clearing existing database: {DATABASE_NAME}")
+        # Create an engine
+        engine = create_engine(f"sqlite:///{DATABASE_NAME}", poolclass=NullPool)
+        with engine.connect() as connection:
+            # Drop all tables
+            metadata.drop_all(bind=connection)
+            # Recreate all tables
+            metadata.create_all(bind=connection)
+        engine.dispose()  # Dispose of the engine after clearing
+        print("Database cleared and schema recreated.")
+    else:
+        print(f"Database file does not exist. Creating a new database: {DATABASE_NAME}")
+        # Create an engine
+        engine = create_engine(f"sqlite:///{DATABASE_NAME}", poolclass=NullPool)
+        with engine.connect() as connection:
+            # Create all tables based on the schema
+            metadata.create_all(bind=connection)
+        engine.dispose()  # Dispose of the engine after creation
+        print("Database schema creation complete.")
 
 def refresh_database():
     print("Populating database with Hevy workout data...")

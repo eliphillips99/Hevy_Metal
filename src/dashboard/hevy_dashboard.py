@@ -132,13 +132,13 @@ elif page == "Data Input":
     with st.form("add_diet_week_form"):
         week_start_date = st.date_input("Week Start Date", date.today())
         calorie_target = st.number_input("Calorie Target", value=0.0, step=1.0)
-        source = st.text_input("Source (optional)")
+        source = 'streamlit form'
         submitted_week = st.form_submit_button("Add Week")
         if submitted_week:
             current_cycle = query_get_current_diet_cycle()
             if current_cycle:
                 cycle_id = current_cycle.cycle_id
-                query_insert_diet_week(cycle_id, week_start_date, calorie_target)
+                query_insert_diet_week(cycle_id, week_start_date, calorie_target, source=source)
                 st.success("Diet week added successfully.")
                 set_query_params(page="Data Input")  # Use helper function
             else:
