@@ -99,13 +99,14 @@ def import_diet_weeks_from_csv(csv_file_path, source="diet_weeks_csv"):
             # Insert into diet_weeks table
             cursor.execute("""
                 INSERT INTO diet_weeks (
-                    cycle_id, common_data_id, week_id, week_start_date, calorie_target, created_at, updated_at
+                    cycle_id, common_data_id, week_id, source, week_start_date, calorie_target, created_at, updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 cycle_id,
                 common_data_id,
                 week_id,
+                source,
                 week_start_date,
                 calorie_target,
                 datetime.now().strftime("%Y-%m-%d %H:%M:%S"),

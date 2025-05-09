@@ -115,6 +115,7 @@ diet_weeks_table = Table(
     Column('common_data_id', Integer, ForeignKey('common_data.common_data_id'), nullable=False),  # Added column
     Column('week_start_date', Date, nullable=False),
     Column('calorie_target', Float),
+    Column('source', String),
     Column('created_at', DateTime),
     Column('updated_at', DateTime)
 )

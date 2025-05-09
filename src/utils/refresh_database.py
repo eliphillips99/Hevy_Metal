@@ -9,12 +9,13 @@ import time
 
 from utils.historical_hevy import main as populate_hevy_data
 from utils.historical_health import import_historical_data
-from utils.historical_diet import import_diet_cycles_from_csv
+from utils.historical_diet import import_diet_cycles_from_csv, import_diet_weeks_from_csv
 from src.database.schema import metadata
 
 DATABASE_NAME = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../data/hevy_metal.db"))
 HEALTH_JSON_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../data/HealthAutoExport-2023-06-17-2025-04-26.json"))
 DIET_CYCLES_CSV_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../data/diet_cycles.csv"))
+DIET_WEEKS_CSV_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../data/diet_weeks.csv"))
 
 def initialize():
     """Initialize the database by clearing the existing one."""
@@ -57,6 +58,13 @@ def refresh_database():
         import_diet_cycles_from_csv(DIET_CYCLES_CSV_FILE)
     else:
         print(f"Diet cycles CSV file not found: {DIET_CYCLES_CSV_FILE}. Skipping diet cycle data import.")
+
+    # Step 7: Populate the diet_weeks table
+    if os.path.exists(DIET_WEEKS_CSV_FILE):
+        print("Populating database with diet cycle data...")
+        import_diet_weeks_from_csv(DIET_WEEKS_CSV_FILE)
+    else:
+        print(f"Diet weeks CSV file not found: {DIET_WEEKS_CSV_FILE}. Skipping diet weeks data import.")
 
     print("Database refresh complete.")
 
