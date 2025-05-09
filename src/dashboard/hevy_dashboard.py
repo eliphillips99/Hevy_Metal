@@ -10,6 +10,10 @@ project_root = os.path.abspath(os.path.join(current_dir, "../../"))
 if project_root not in sys.path:
     sys.path.append(project_root)
 
+DIET_CYCLES_CSV_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../data/diet_cycles.csv"))
+DIET_WEEKS_CSV_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../data/diet_weeks.csv"))
+
+
 from src.database.queries.hevy_sql_queries import (
     query_get_all_workouts,
     query_get_exercises_in_workout,
@@ -35,6 +39,19 @@ db = Session(bind=engine)
 def set_query_params(**params):
     """Helper function to set query parameters."""
     st.experimental_set_query_params(**params)  # Use experimental method for now
+
+'''def append_to_diet_weeks_csv(cycle_id, week_id, week_start_date, calorie_target, source):
+    """Append a new diet week to the CSV file."""
+
+    weeks_pd = pd.read_csv(DIET_WEEKS_CSV_FILE)
+    new_row = {
+        "cycle_id": cycle_id,
+        "week_id": week_id,
+        "week_start_date": week_start_date,
+        "calorie_target": calorie_target,
+        "common_data_source": source
+    }
+    '''
 
 # Sidebar navigation
 st.sidebar.title("Navigation")
@@ -138,7 +155,12 @@ elif page == "Data Input":
             current_cycle = query_get_current_diet_cycle()
             if current_cycle:
                 cycle_id = current_cycle.cycle_id
-                query_insert_diet_week(cycle_id, week_start_date, calorie_target, source=source)
+                query_insert_diet_week(
+                    cycle_id=cycle_id,
+                    week_start_date=week_start_date,
+                    calorie_target=calorie_target,
+                    source=source  # Ensure source is passed
+                )
                 st.success("Diet week added successfully.")
                 set_query_params(page="Data Input")  # Use helper function
             else:
