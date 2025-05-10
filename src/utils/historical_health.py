@@ -273,16 +273,6 @@ def pull_markers_from_json(metric_data, metric_name, cursor, markers_data_groupe
         if all(value is None for value in marker_values.values()):
             continue
 
-        time_in_daylight = marker_values.get("time_in_daylight")
-        vo2_max = marker_values.get("vo2_max")
-        heart_rate = marker_values.get("heart_rate")
-        heart_rate_variability = marker_values.get("heart_rate_variability")
-        resting_heart_rate = marker_values.get("resting_heart_rate")
-        respiratory_rate = marker_values.get("respiratory_rate")
-        blood_oxygen_saturation = marker_values.get("blood_oxygen_saturation")
-        body_weight_lbs = marker_values.get("body_weight_lbs")
-        body_mass_index = marker_values.get("body_mass_index")
-
         # Convert date to a datetime object
         try:
             timestamp = datetime.strptime(date, "%Y-%m-%d %H:%M:%S %z")
@@ -315,9 +305,17 @@ def pull_markers_from_json(metric_data, metric_name, cursor, markers_data_groupe
                     updated_at = ?
                 WHERE common_data_id = ?
             """, (
-                time_in_daylight, vo2_max, heart_rate, heart_rate_variability, resting_heart_rate,
-                respiratory_rate, blood_oxygen_saturation, body_mass_index, body_weight_lbs,
-                datetime.now().strftime("%Y-%m-%d %H:%M:%S"), common_data_id
+                marker_values.get("time_in_daylight"),
+                marker_values.get("vo2_max"),
+                marker_values.get("heart_rate"),
+                marker_values.get("heart_rate_variability"),
+                marker_values.get("resting_heart_rate"),
+                marker_values.get("respiratory_rate"),
+                marker_values.get("blood_oxygen_saturation"),
+                marker_values.get("body_mass_index"),
+                marker_values.get("body_weight_lbs"),
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                common_data_id
             ))
         else:
             # Insert a new row
@@ -329,8 +327,16 @@ def pull_markers_from_json(metric_data, metric_name, cursor, markers_data_groupe
                 )
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
-                common_data_id, time_in_daylight, vo2_max, heart_rate, heart_rate_variability,
-                resting_heart_rate, respiratory_rate, blood_oxygen_saturation, body_mass_index, body_weight_lbs,
+                common_data_id,
+                marker_values.get("time_in_daylight"),
+                marker_values.get("vo2_max"),
+                marker_values.get("heart_rate"),
+                marker_values.get("heart_rate_variability"),
+                marker_values.get("resting_heart_rate"),
+                marker_values.get("respiratory_rate"),
+                marker_values.get("blood_oxygen_saturation"),
+                marker_values.get("body_mass_index"),
+                marker_values.get("body_weight_lbs"),
                 datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             ))
