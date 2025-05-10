@@ -24,7 +24,7 @@ METRIC_NAME_MAPPING = {
     "carbohydrates": "carbohydrates_g",
     "dietary_sugar": "sugar_g",
     "total_fat": "fat_g",
-    "time_in_daylight": "time_in_daylight",
+    "time_in_daylight": "time_in_daylight_min",
     "vo2_max": "vo2_max",
     "heart_rate": "heart_rate",
     "heart_rate_variability": "heart_rate_variability",
@@ -252,6 +252,9 @@ def pull_markers_from_json(metric_data, metric_name, cursor, markers_data_groupe
         qty = entry.get("qty")
         source = entry.get("source", "Unknown")
 
+        if metric_name == "time_in_daylight_min":
+            print(f"Extracted time_in_daylight: date={date}, qty={qty}, source={source}")
+
         # Group health marker data by date and source
         key = (date, source)
         if key not in markers_data_grouped:
@@ -267,6 +270,8 @@ def pull_markers_from_json(metric_data, metric_name, cursor, markers_data_groupe
                 "body_mass_index": None,
             }
         markers_data_grouped[key][metric_name] = qty
+    
+    #print(f"Grouped data for {metric_name}: {markers_data_grouped}")
 
     for (date, source), marker_values in markers_data_grouped.items():
         # Skip entries where all marker values are None
@@ -364,6 +369,7 @@ def import_daily_data(data, conn):
         metric_data = metric.get("data", [])
         # Translate metric name using the mapping
         metric_name = METRIC_NAME_MAPPING.get(metric_name, metric_name)
+        print(f"Processing metric: {metric_name} with units: {metric_units}")
         #print(f"Mapped Metric Name: {metric_name}, Original Name: {metric.get('name')}")
         insert_raw_data(cursor, metric_name, metric_units, metric_data)
         # Handle sleep_analysis specifically
@@ -443,6 +449,9 @@ def insert_or_update_health_marker(session: Session, data: dict):
             "body_weight_lbs": data.get("body_weight_lbs"),
             "body_mass_index": data.get("body_mass_index"),
             "respiratory_rate": data.get("respiratory_rate"),
+            "time_in_daylight_min": data.get("time_in_daylight_min"),
+            "heart_rate_variability": data.get("heart_rate_variability"),
+            "resting_heart_rate": data.get("resting_heart_rate"),
             "blood_oxygen_saturation": data.get("blood_oxygen_saturation"),
             "updated_at": data.get("updated_at"),
         })
@@ -464,6 +473,9 @@ def insert_or_update_health_marker(session: Session, data: dict):
                     body_weight_lbs=data.get("body_weight_lbs"),
                     body_mass_index=data.get("body_mass_index"),
                     respiratory_rate=data.get("respiratory_rate"),
+                    time_in_daylight_min=data.get("time_in_daylight_min"),
+                    heart_rate_variability=data.get("heart_rate_variability"),
+                    resting_heart_rate=data.get("resting_heart_rate"),
                     blood_oxygen_saturation=data.get("blood_oxygen_saturation"),
                     created_at=data.get("created_at"),
                     updated_at=data.get("updated_at"),
