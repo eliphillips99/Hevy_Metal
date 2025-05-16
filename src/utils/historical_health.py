@@ -247,17 +247,19 @@ def pull_nutrition_from_json(metric_data, metric_name, cursor, nutrition_data_gr
             ))
 
 def pull_markers_from_json(metric_data, metric_name, cursor, markers_data_grouped):
+    print(f"Processing metric: {metric_name}")
     for entry in metric_data:
         date = entry.get("date")
         source = entry.get("source", "Unknown")
         qty = entry.get("qty")  # Extract the qty field
 
         # Debugging: Log the raw entry being processed
-        if metric_name == "time_in_daylight":
+        if metric_name == "time_in_daylight_min":
             print(f"Raw entry for time_in_daylight: {entry}")
+            print(f"Grouped data for time_in_daylight before database operation: {markers_data_grouped}")
 
         # Ensure qty is extracted correctly
-        if metric_name == "time_in_daylight" and qty is None:
+        if metric_name == "time_in_daylight_min" and qty is None:
             print(f"Warning: Missing 'qty' for time_in_daylight in entry: {entry}")
             continue
 
@@ -271,7 +273,7 @@ def pull_markers_from_json(metric_data, metric_name, cursor, markers_data_groupe
             avg_val = qty  # Use qty for non-heart_rate metrics
 
         # Debugging: Log the extracted qty value
-        if metric_name == "time_in_daylight":
+        if metric_name == "time_in_daylight_min":
             print(f"Extracted qty for time_in_daylight: {qty}")
 
         # Check if date or avg_val is missing
@@ -290,7 +292,7 @@ def pull_markers_from_json(metric_data, metric_name, cursor, markers_data_groupe
         key = (date, source)
         if key not in markers_data_grouped:
             markers_data_grouped[key] = {
-                "time_in_daylight": None,
+                "time_in_daylight_min": None,
                 "vo2_max": None,
                 "heart_rate_min": None,
                 "heart_rate_max": None,
@@ -306,13 +308,11 @@ def pull_markers_from_json(metric_data, metric_name, cursor, markers_data_groupe
             markers_data_grouped[key]["heart_rate_min"] = min_val
             markers_data_grouped[key]["heart_rate_max"] = max_val
             markers_data_grouped[key]["heart_rate_avg"] = avg_val
-        elif metric_name == "time_in_daylight":
-            markers_data_grouped[key]["time_in_daylight"] = avg_val  # Assign qty to time_in_daylight
         else:
             markers_data_grouped[key][metric_name] = avg_val
 
     # Debugging: Log grouped data for time_in_daylight
-    if metric_name == "time_in_daylight":
+    if metric_name == "time_in_daylight_min":
         print(f"Grouped data for time_in_daylight: {markers_data_grouped}")
 
     for (date, source), marker_values in markers_data_grouped.items():
@@ -331,7 +331,7 @@ def pull_markers_from_json(metric_data, metric_name, cursor, markers_data_groupe
         common_data_id = get_or_create_common_data_id(cursor, timestamp, source)
 
         # Debugging: Log the values being updated or inserted
-        print(f"Preparing to update/insert for common_data_id={common_data_id}, time_in_daylight_min={marker_values.get('time_in_daylight')}")
+        #print(f"Preparing to update/insert for common_data_id={common_data_id}, time_in_daylight_min={marker_values.get('time_in_daylight')}")
 
         # Check if a row already exists for this common_data_id
         cursor.execute("""
@@ -341,7 +341,7 @@ def pull_markers_from_json(metric_data, metric_name, cursor, markers_data_groupe
 
         if existing_row:
             # Debugging: Log the SQL update query
-            print(f"Updating health_markers for common_data_id={common_data_id}, time_in_daylight_min={marker_values.get('time_in_daylight')}")
+            #print(f"Updating health_markers for common_data_id={common_data_id}, time_in_daylight_min={marker_values.get('time_in_daylight')}")
             cursor.execute("""
                 UPDATE health_markers
                 SET time_in_daylight_min = COALESCE(?, time_in_daylight_min),
@@ -358,7 +358,7 @@ def pull_markers_from_json(metric_data, metric_name, cursor, markers_data_groupe
                     updated_at = ?
                 WHERE common_data_id = ?
             """, (
-                marker_values.get("time_in_daylight"),
+                marker_values.get("time_in_daylight_min"),
                 marker_values.get("vo2_max"),
                 marker_values.get("heart_rate_min"),
                 marker_values.get("heart_rate_max"),
@@ -374,7 +374,7 @@ def pull_markers_from_json(metric_data, metric_name, cursor, markers_data_groupe
             ))
         else:
             # Debugging: Log the SQL insert query
-            print(f"Inserting into health_markers: common_data_id={common_data_id}, time_in_daylight_min={marker_values.get('time_in_daylight')}")
+            #print(f"Inserting into health_markers: common_data_id={common_data_id}, time_in_daylight_min={marker_values.get('time_in_daylight')}")
             cursor.execute("""
                 INSERT INTO health_markers (
                     common_data_id, time_in_daylight_min, vo2_max, heart_rate_min, heart_rate_max, heart_rate_avg,
@@ -384,7 +384,7 @@ def pull_markers_from_json(metric_data, metric_name, cursor, markers_data_groupe
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 common_data_id,
-                marker_values.get("time_in_daylight"),
+                marker_values.get("time_in_daylight_min"),
                 marker_values.get("vo2_max"),
                 marker_values.get("heart_rate_min"),
                 marker_values.get("heart_rate_max"),
@@ -411,18 +411,21 @@ def import_daily_data(data, conn):
     nutrition_data_grouped = {}
 
     markers_metrics = [
-        "time_in_daylight", "vo2_max", "heart_rate", "heart_rate_variability", "resting_heart_rate",
+        "time_in_daylight_min", "vo2_max", "heart_rate", "heart_rate_variability", "resting_heart_rate",
         "respiratory_rate", "blood_oxygen_saturation", "body_weight_lbs", "body_mass_index"]
     markers_data_grouped = {}
 
     # Import metrics data
     for metric in data.get("metrics", []):
         metric_name = metric.get("name")
+        print(f"Found metric: {metric_name}")
+
         metric_units = metric.get("units")
         metric_data = metric.get("data", [])
         # Translate metric name using the mapping
         metric_name = METRIC_NAME_MAPPING.get(metric_name, metric_name)
-        print(f"Processing metric: {metric_name} with units: {metric_units}")
+        print(f"Translated Metric Name: {metric_name}")
+        #print(f"Processing metric: {metric_name} with units: {metric_units}")
         #print(f"Mapped Metric Name: {metric_name}, Original Name: {metric.get('name')}")
         insert_raw_data(cursor, metric_name, metric_units, metric_data)
         # Handle sleep_analysis specifically
