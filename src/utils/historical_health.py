@@ -249,11 +249,28 @@ def pull_nutrition_from_json(metric_data, metric_name, cursor, nutrition_data_gr
 def pull_markers_from_json(metric_data, metric_name, cursor, markers_data_grouped):
     for entry in metric_data:
         date = entry.get("date")
-        qty = entry.get("qty")
         source = entry.get("source", "Unknown")
 
-        if metric_name == "time_in_daylight_min":
-            print(f"Extracted time_in_daylight: date={date}, qty={qty}, source={source}")
+        # Handle heart rate separately to extract Min, Max, and Avg
+        if metric_name == "heart_rate":
+            min_val = entry.get("Min")
+            max_val = entry.get("Max")
+            avg_val = entry.get("Avg")
+        else:
+            min_val = max_val = None
+            avg_val = entry.get("qty")  # Initialize avg_val for non-heart_rate metrics
+
+        # Check if date or avg_val is missing
+        if not date or avg_val is None:
+            print(f"Warning: Missing 'date' or 'avg' for {metric_name} in entry: {entry}")
+            continue
+
+        # Convert date to a datetime object
+        try:
+            timestamp = datetime.strptime(date, "%Y-%m-%d %H:%M:%S %z")
+        except ValueError as e:
+            print(f"Error parsing date '{date}' for {metric_name}: {e}")
+            continue
 
         # Group health marker data by date and source
         key = (date, source)
@@ -261,7 +278,9 @@ def pull_markers_from_json(metric_data, metric_name, cursor, markers_data_groupe
             markers_data_grouped[key] = {
                 "time_in_daylight": None,
                 "vo2_max": None,
-                "heart_rate": None,
+                "heart_rate_min": None,
+                "heart_rate_max": None,
+                "heart_rate_avg": None,
                 "heart_rate_variability": None,
                 "resting_heart_rate": None,
                 "respiratory_rate": None,
@@ -269,9 +288,12 @@ def pull_markers_from_json(metric_data, metric_name, cursor, markers_data_groupe
                 "body_weight_lbs": None,
                 "body_mass_index": None,
             }
-        markers_data_grouped[key][metric_name] = qty
-    
-    #print(f"Grouped data for {metric_name}: {markers_data_grouped}")
+        if metric_name == "heart_rate":
+            markers_data_grouped[key]["heart_rate_min"] = min_val
+            markers_data_grouped[key]["heart_rate_max"] = max_val
+            markers_data_grouped[key]["heart_rate_avg"] = avg_val
+        else:
+            markers_data_grouped[key][metric_name] = avg_val
 
     for (date, source), marker_values in markers_data_grouped.items():
         # Skip entries where all marker values are None
@@ -300,7 +322,9 @@ def pull_markers_from_json(metric_data, metric_name, cursor, markers_data_groupe
                 UPDATE health_markers
                 SET time_in_daylight_min = COALESCE(?, time_in_daylight_min),
                     vo2_max = COALESCE(?, vo2_max),
-                    heart_rate = COALESCE(?, heart_rate),
+                    heart_rate_min = COALESCE(?, heart_rate_min),
+                    heart_rate_max = COALESCE(?, heart_rate_max),
+                    heart_rate_avg = COALESCE(?, heart_rate_avg),
                     heart_rate_variability = COALESCE(?, heart_rate_variability),
                     resting_heart_rate = COALESCE(?, resting_heart_rate),
                     respiratory_rate = COALESCE(?, respiratory_rate),
@@ -312,7 +336,9 @@ def pull_markers_from_json(metric_data, metric_name, cursor, markers_data_groupe
             """, (
                 marker_values.get("time_in_daylight"),
                 marker_values.get("vo2_max"),
-                marker_values.get("heart_rate"),
+                marker_values.get("heart_rate_min"),
+                marker_values.get("heart_rate_max"),
+                marker_values.get("heart_rate_avg"),
                 marker_values.get("heart_rate_variability"),
                 marker_values.get("resting_heart_rate"),
                 marker_values.get("respiratory_rate"),
@@ -326,16 +352,18 @@ def pull_markers_from_json(metric_data, metric_name, cursor, markers_data_groupe
             # Insert a new row
             cursor.execute("""
                 INSERT INTO health_markers (
-                    common_data_id, time_in_daylight_min, vo2_max, heart_rate, heart_rate_variability,
-                    resting_heart_rate, respiratory_rate, blood_oxygen_saturation, body_mass_index, body_weight_lbs,
-                    created_at, updated_at
+                    common_data_id, time_in_daylight_min, vo2_max, heart_rate_min, heart_rate_max, heart_rate_avg,
+                    heart_rate_variability, resting_heart_rate, respiratory_rate, blood_oxygen_saturation,
+                    body_mass_index, body_weight_lbs, created_at, updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 common_data_id,
                 marker_values.get("time_in_daylight"),
                 marker_values.get("vo2_max"),
-                marker_values.get("heart_rate"),
+                marker_values.get("heart_rate_min"),
+                marker_values.get("heart_rate_max"),
+                marker_values.get("heart_rate_avg"),
                 marker_values.get("heart_rate_variability"),
                 marker_values.get("resting_heart_rate"),
                 marker_values.get("respiratory_rate"),

@@ -127,7 +127,9 @@ health_markers_table = Table(
     Column('common_data_id', Integer, ForeignKey('common_data.common_data_id'), nullable=False),
     Column('time_in_daylight_min', Float),
     Column('vo2_max', Float),
-    Column('heart_rate', Float),
+    Column('heart_rate_min', Float),  # New column for heart rate minimum
+    Column('heart_rate_max', Float),  # New column for heart rate maximum
+    Column('heart_rate_avg', Float),  # New column for heart rate average
     Column('heart_rate_variability', Float),
     Column('resting_heart_rate', Float),
     Column('respiratory_rate', Float),

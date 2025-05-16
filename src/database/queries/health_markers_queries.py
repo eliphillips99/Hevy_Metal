@@ -10,7 +10,9 @@ def query_get_health_markers(start_date=None, end_date=None):
     # Join health_markers_table with common_data to filter by date
     query = select(
         common_data.c.date.label("Date"),
-        health_markers_table.c.heart_rate.label("Heart Rate"),
+        health_markers_table.c.heart_rate_min.label("Heart Rate Min"),
+        health_markers_table.c.heart_rate_max.label("Heart Rate Max"),
+        health_markers_table.c.heart_rate_avg.label("Heart Rate Avg"),
         health_markers_table.c.vo2_max.label("VO2 Max"),
         health_markers_table.c.body_weight_lbs.label("Body Weight (lbs)"),
         health_markers_table.c.body_mass_index.label("BMI"),
