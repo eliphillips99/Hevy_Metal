@@ -4,31 +4,14 @@ from datetime import datetime
 import os
 import uuid  # Add this import for generating unique IDs
 from dateutil.parser import parse  # Add this import for flexible date parsing
+from src.database.database_utils import get_or_create_common_data_id
 
 # Path to your SQLite database
 DATABASE_NAME = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../data/hevy_metal.db"))
 
-def get_or_create_common_data_id(cursor, date, source="diet_cycles"):
-    """
-    Get or create a common_data_id for a given date and source.
-    """
-    date_str = date.strftime("%Y-%m-%d %H:%M:%S") if isinstance(date, datetime) else date
-    cursor.execute("""
-        SELECT common_data_id FROM common_data WHERE date = ? AND source = ?
-    """, (date_str, source))
-    result = cursor.fetchone()
-    if result:
-        return result[0]
-    
-    # Insert new common_data entry
-    cursor.execute("""
-        INSERT INTO common_data (date, source)
-        VALUES (?, ?)
-    """, (date_str, source))
-    return cursor.lastrowid
-
 # Function to import diet cycles from a CSV file
-def import_diet_cycles_from_csv(csv_file_path):
+def import_diet_cycles_from_csv(csv_file_path, source="diet_cycles"):
+    """Import diet cycles from a CSV file into the database."""
     # Read the CSV file into a pandas DataFrame
     try:
         df = pd.read_csv(csv_file_path)
@@ -40,7 +23,7 @@ def import_diet_cycles_from_csv(csv_file_path):
     required_columns = ["common_data_id", "start_date", "cycle_type"]
     for col in required_columns:
         if col not in df.columns:
-            if (col == "common_data_id"):
+            if col == "common_data_id":
                 print("common_data_id column is missing. Generating unique IDs for each row.")
                 df["common_data_id"] = [str(uuid.uuid4()) for _ in range(len(df))]
             else:
@@ -62,15 +45,15 @@ def import_diet_cycles_from_csv(csv_file_path):
             end_date = parse(row["end_date"]).date() if "end_date" in row and not pd.isna(row["end_date"]) else None
 
             # Get or create common_data_id
-            common_data_id = get_or_create_common_data_id(cursor, start_date)
+            common_data_id = get_or_create_common_data_id(cursor, start_date, source)
 
             # Prepare the SQL query
             cursor.execute("""
                 INSERT INTO diet_cycles (
                     common_data_id, start_date, end_date, cycle_type, gain_rate_lbs_per_week,
-                    loss_rate_lbs_per_week, notes, created_at, updated_at
+                    loss_rate_lbs_per_week, notes, source, created_at, updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 common_data_id,
                 start_date,
@@ -79,6 +62,7 @@ def import_diet_cycles_from_csv(csv_file_path):
                 row.get("gain_rate_lbs_per_week"),
                 row.get("loss_rate_lbs_per_week"),
                 row.get("notes"),
+                source,  # Ensure source is populated
                 datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             ))
@@ -89,6 +73,52 @@ def import_diet_cycles_from_csv(csv_file_path):
     conn.commit()
     conn.close()
     print("Diet cycles imported successfully.")
+
+def import_diet_weeks_from_csv(csv_file_path, source="diet_weeks_csv"):
+    """Import diet weeks from a CSV file into the database."""
+    try:
+        df = pd.read_csv(csv_file_path)
+    except Exception as e:
+        print(f"Error reading CSV file: {e}")
+        return
+
+    conn = sqlite3.connect(DATABASE_NAME)
+    cursor = conn.cursor()
+
+    for _, row in df.iterrows():
+        try:
+            # Parse dates
+            week_start_date = parse(row["week_start_date"]).date()
+            calorie_target = row["calorie_target"]
+            cycle_id = row["cycle_id"]
+            week_id = row["week_id"] if "week_id" in row else None
+            source = row.get("common_data_source", source)
+
+            # Get or create common_data_id
+            common_data_id = get_or_create_common_data_id(cursor, week_start_date, source)
+
+            # Insert into diet_weeks table
+            cursor.execute("""
+                INSERT INTO diet_weeks (
+                    cycle_id, common_data_id, week_id, source, week_start_date, calorie_target, created_at, updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                cycle_id,
+                common_data_id,
+                week_id,
+                source,  # Ensure source is populated
+                week_start_date,
+                calorie_target,
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            ))
+        except Exception as e:
+            print(f"Error inserting row: {row.to_dict()}, Error: {e}")
+
+    conn.commit()
+    conn.close()
+    print("Diet weeks imported successfully.")
 
 # Example usage
 if __name__ == "__main__":

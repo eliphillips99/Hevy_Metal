@@ -1,5 +1,5 @@
 # workout-analytics/database_schema.py
-from sqlalchemy import MetaData, Table, Column, Integer, String, Float, DateTime, Date, ForeignKey
+from sqlalchemy import MetaData, Table, Column, Integer, String, Float, DateTime, Date, ForeignKey, UniqueConstraint
 from src.database.connection import engine
 
 metadata = MetaData()
@@ -8,6 +8,7 @@ common_data = Table('common_data', metadata,
     Column('common_data_id', Integer, primary_key=True),
     Column('date', DateTime, nullable=False),
     Column('source', String),
+    UniqueConstraint('date', 'source', name='uq_date_source')
 )
 
 workouts_table = Table('workouts', metadata,
@@ -102,6 +103,7 @@ diet_cycles_table = Table(
     Column('cycle_type', String, nullable=False),
     Column('gain_rate_lbs_per_week', Float),
     Column('loss_rate_lbs_per_week', Float),
+    Column('source', String),
     Column('notes', String),
     Column('created_at', DateTime),
     Column('updated_at', DateTime)
@@ -114,6 +116,7 @@ diet_weeks_table = Table(
     Column('common_data_id', Integer, ForeignKey('common_data.common_data_id'), nullable=False),  # Added column
     Column('week_start_date', Date, nullable=False),
     Column('calorie_target', Float),
+    Column('source', String),
     Column('created_at', DateTime),
     Column('updated_at', DateTime)
 )
@@ -124,7 +127,9 @@ health_markers_table = Table(
     Column('common_data_id', Integer, ForeignKey('common_data.common_data_id'), nullable=False),
     Column('time_in_daylight_min', Float),
     Column('vo2_max', Float),
-    Column('heart_rate', Float),
+    Column('heart_rate_min', Float),  # New column for heart rate minimum
+    Column('heart_rate_max', Float),  # New column for heart rate maximum
+    Column('heart_rate_avg', Float),  # New column for heart rate average
     Column('heart_rate_variability', Float),
     Column('resting_heart_rate', Float),
     Column('respiratory_rate', Float),

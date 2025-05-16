@@ -6,6 +6,8 @@ from datetime import date
 from sqlalchemy import func
 from src.database.schema import health_markers_table, common_data
 from sqlalchemy.orm import Session
+from src.database.database_utils import get_or_create_common_data_id
+from sqlalchemy.exc import IntegrityError
 
 DATABASE_NAME = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../data/hevy_metal.db"))
 JSON_FILE_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../data/HealthAutoExport-2023-06-17-2025-04-26.json"))
@@ -22,7 +24,7 @@ METRIC_NAME_MAPPING = {
     "carbohydrates": "carbohydrates_g",
     "dietary_sugar": "sugar_g",
     "total_fat": "fat_g",
-    "time_in_daylight": "time_in_daylight",
+    "time_in_daylight": "time_in_daylight_min",
     "vo2_max": "vo2_max",
     "heart_rate": "heart_rate",
     "heart_rate_variability": "heart_rate_variability",
@@ -31,26 +33,6 @@ METRIC_NAME_MAPPING = {
     "blood_oxygen_saturation": "blood_oxygen_saturation",
     "body_mass_index": "body_mass_index"
 }
-
-def get_or_create_common_data_id(cursor, date, source):
-    """
-    Get or create a common_data_id for a given date and source.
-    """
-    # Ensure date is stored as a string
-    date_str = date.strftime("%Y-%m-%d %H:%M:%S %z") if isinstance(date, datetime) else date
-    cursor.execute("""
-        SELECT common_data_id FROM common_data WHERE date = ? AND source = ?
-    """, (date_str, source))
-    result = cursor.fetchone()
-    if result:
-        return result[0]
-    
-    # Insert new common_data entry
-    cursor.execute("""
-        INSERT INTO common_data (date, source)
-        VALUES (?, ?)
-    """, (date_str, source))
-    return cursor.lastrowid
 
 def get_or_create_metric_id(cursor, metric_name, units, category="general"):
     """
@@ -73,25 +55,29 @@ def get_or_create_metric_id(cursor, metric_name, units, category="general"):
 def insert_raw_data(cursor, metric_name, metric_units, metric_data):
     metric_id = get_or_create_metric_id(cursor, metric_name, metric_units)
 
-    print(f"Processing metric: {metric_name}, Units: {metric_units}, Entries: {len(metric_data)}")
-
-
     for entry in metric_data:
         date = entry.get("date")
         qty = entry.get("qty")
         source = entry.get("source", "Unknown")
 
-        #print(f"Inserting metric entry: Date: {date}, Qty: {qty}, Source: {source}")
-
         # Convert date to a datetime object
         try:
-            timestamp = datetime.strptime(date, "%Y-%m-%d %H:%M:%S %z")
+            date = datetime.strptime(date, "%Y-%m-%d %H:%M:%S %z")
         except ValueError as e:
             print(f"Error parsing date '{date}': {e}")
             continue
 
+        # Check if an entry for this date and metric already exists
+        cursor.execute("""
+            SELECT 1 FROM data WHERE metric_id = ? AND common_data_id = (
+                SELECT common_data_id FROM common_data WHERE date = ? AND source = ?
+            )
+        """, (metric_id, date, source))
+        if cursor.fetchone():
+            continue  # Skip duplicate entry
+
         # Get or create the common_data_id
-        common_data_id = get_or_create_common_data_id(cursor, timestamp, source)
+        common_data_id = get_or_create_common_data_id(cursor, date, source)
 
         # Insert into the data table
         try:
@@ -99,11 +85,10 @@ def insert_raw_data(cursor, metric_name, metric_units, metric_data):
                 INSERT INTO data (common_data_id, metric_id, qty, data_json, created_at, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?)
             """, (common_data_id, metric_id, qty, json.dumps(entry), 
-                    datetime.now().strftime("%Y-%m-%d %H:%M:%S"), 
-                    datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
-            
+                  datetime.now().strftime("%Y-%m-%d %H:%M:%S"), 
+                  datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
         except sqlite3.IntegrityError as e:
-            print(f"Error inserting data for metric '{metric_name}': {e}")   
+            print(f"Error inserting data for metric '{metric_name}': {e}")
 
 def pull_sleep_from_json(metric_data, cursor):
 
@@ -177,7 +162,6 @@ def pull_nutrition_from_json(metric_data, metric_name, cursor, nutrition_data_gr
 
         # Group nutrition data by date and source
         key = (date, source)
-        #print(f"Grouping Key: {key}, Metric Name: {metric_name}, Qty: {qty}")
         if key not in nutrition_data_grouped:
             nutrition_data_grouped[key] = {
                 "calories": None,
@@ -192,7 +176,6 @@ def pull_nutrition_from_json(metric_data, metric_name, cursor, nutrition_data_gr
                 "sugar_g": None
             }
         nutrition_data_grouped[key][metric_name] = qty
-        #print(f"Grouped Key: {key}, Metric: {metric_name}, Qty: {qty}")  # Debug stateme
 
     for (date, source), nutrition_values in nutrition_data_grouped.items():
         calories = nutrition_values.get("calories")
@@ -207,13 +190,22 @@ def pull_nutrition_from_json(metric_data, metric_name, cursor, nutrition_data_gr
         sugar_g = nutrition_values.get("sugar_g")
 
         try:
-            timestamp = datetime.strptime(date, "%Y-%m-%d %H:%M:%S %z")
+            date = datetime.strptime(date, "%Y-%m-%d %H:%M:%S %z")
         except ValueError as e:
             print(f"Error parsing nutrition date '{date}': {e}")
             continue
 
+        # Check if an entry for this date and source already exists
+        cursor.execute("""
+            SELECT 1 FROM nutrition_data WHERE common_data_id = (
+                SELECT common_data_id FROM common_data WHERE date = ? AND source = ?
+            )
+        """, (date, source))
+        if cursor.fetchone():
+            continue  # Skip duplicate entry
+
         # Get or create the common_data_id
-        common_data_id = get_or_create_common_data_id(cursor, timestamp, source)
+        common_data_id = get_or_create_common_data_id(cursor, date, source)
 
         cursor.execute("""
             SELECT 1 FROM nutrition_data WHERE common_data_id = ?
@@ -255,18 +247,56 @@ def pull_nutrition_from_json(metric_data, metric_name, cursor, nutrition_data_gr
             ))
 
 def pull_markers_from_json(metric_data, metric_name, cursor, markers_data_grouped):
+    print(f"Processing metric: {metric_name}")
     for entry in metric_data:
         date = entry.get("date")
-        qty = entry.get("qty")
         source = entry.get("source", "Unknown")
+        qty = entry.get("qty")  # Extract the qty field
+
+        # Debugging: Log the raw entry being processed
+        if metric_name == "time_in_daylight_min":
+            print(f"Raw entry for time_in_daylight: {entry}")
+            print(f"Grouped data for time_in_daylight before database operation: {markers_data_grouped}")
+
+        # Ensure qty is extracted correctly
+        if metric_name == "time_in_daylight_min" and qty is None:
+            print(f"Warning: Missing 'qty' for time_in_daylight in entry: {entry}")
+            continue
+
+        # Handle heart rate separately to extract Min, Max, and Avg
+        if metric_name == "heart_rate":
+            min_val = entry.get("Min")
+            max_val = entry.get("Max")
+            avg_val = entry.get("Avg")
+        else:
+            min_val = max_val = None
+            avg_val = qty  # Use qty for non-heart_rate metrics
+
+        # Debugging: Log the extracted qty value
+        if metric_name == "time_in_daylight_min":
+            print(f"Extracted qty for time_in_daylight: {qty}")
+
+        # Check if date or avg_val is missing
+        if not date or avg_val is None:
+            print(f"Warning: Missing 'date' or 'qty' for {metric_name} in entry: {entry}")
+            continue
+
+        # Convert date to a datetime object
+        try:
+            timestamp = datetime.strptime(date, "%Y-%m-%d %H:%M:%S %z")
+        except ValueError as e:
+            print(f"Error parsing date '{date}' for {metric_name}: {e}")
+            continue
 
         # Group health marker data by date and source
         key = (date, source)
         if key not in markers_data_grouped:
             markers_data_grouped[key] = {
-                "time_in_daylight": None,
+                "time_in_daylight_min": None,
                 "vo2_max": None,
-                "heart_rate": None,
+                "heart_rate_min": None,
+                "heart_rate_max": None,
+                "heart_rate_avg": None,
                 "heart_rate_variability": None,
                 "resting_heart_rate": None,
                 "respiratory_rate": None,
@@ -274,22 +304,21 @@ def pull_markers_from_json(metric_data, metric_name, cursor, markers_data_groupe
                 "body_weight_lbs": None,
                 "body_mass_index": None,
             }
-        markers_data_grouped[key][metric_name] = qty
+        if metric_name == "heart_rate":
+            markers_data_grouped[key]["heart_rate_min"] = min_val
+            markers_data_grouped[key]["heart_rate_max"] = max_val
+            markers_data_grouped[key]["heart_rate_avg"] = avg_val
+        else:
+            markers_data_grouped[key][metric_name] = avg_val
+
+    # Debugging: Log grouped data for time_in_daylight
+    if metric_name == "time_in_daylight_min":
+        print(f"Grouped data for time_in_daylight: {markers_data_grouped}")
 
     for (date, source), marker_values in markers_data_grouped.items():
         # Skip entries where all marker values are None
         if all(value is None for value in marker_values.values()):
             continue
-
-        time_in_daylight = marker_values.get("time_in_daylight")
-        vo2_max = marker_values.get("vo2_max")
-        heart_rate = marker_values.get("heart_rate")
-        heart_rate_variability = marker_values.get("heart_rate_variability")
-        resting_heart_rate = marker_values.get("resting_heart_rate")
-        respiratory_rate = marker_values.get("respiratory_rate")
-        blood_oxygen_saturation = marker_values.get("blood_oxygen_saturation")
-        body_weight_lbs = marker_values.get("body_weight_lbs")
-        body_mass_index = marker_values.get("body_mass_index")
 
         # Convert date to a datetime object
         try:
@@ -301,32 +330,25 @@ def pull_markers_from_json(metric_data, metric_name, cursor, markers_data_groupe
         # Get or create the common_data_id
         common_data_id = get_or_create_common_data_id(cursor, timestamp, source)
 
+        # Debugging: Log the values being updated or inserted
+        #print(f"Preparing to update/insert for common_data_id={common_data_id}, time_in_daylight_min={marker_values.get('time_in_daylight')}")
+
         # Check if a row already exists for this common_data_id
         cursor.execute("""
-        SELECT 1 FROM health_markers WHERE common_data_id = ?
+            SELECT * FROM health_markers WHERE common_data_id = ?
         """, (common_data_id,))
-        if cursor.fetchone() is None:
-            # Insert a new row
-            cursor.execute("""
-                INSERT INTO health_markers (
-                    common_data_id, time_in_daylight_min, vo2_max, heart_rate, heart_rate_variability,
-                    resting_heart_rate, respiratory_rate, blood_oxygen_saturation, body_mass_index, body_weight_lbs,
-                    created_at, updated_at
-                )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                common_data_id, time_in_daylight, vo2_max, heart_rate, heart_rate_variability,
-                resting_heart_rate, respiratory_rate, blood_oxygen_saturation, body_mass_index, body_weight_lbs,
-                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            ))
-        else:
-            # Update the existing row
+        existing_row = cursor.fetchone()
+
+        if existing_row:
+            # Debugging: Log the SQL update query
+            #print(f"Updating health_markers for common_data_id={common_data_id}, time_in_daylight_min={marker_values.get('time_in_daylight')}")
             cursor.execute("""
                 UPDATE health_markers
                 SET time_in_daylight_min = COALESCE(?, time_in_daylight_min),
                     vo2_max = COALESCE(?, vo2_max),
-                    heart_rate = COALESCE(?, heart_rate),
+                    heart_rate_min = COALESCE(?, heart_rate_min),
+                    heart_rate_max = COALESCE(?, heart_rate_max),
+                    heart_rate_avg = COALESCE(?, heart_rate_avg),
                     heart_rate_variability = COALESCE(?, heart_rate_variability),
                     resting_heart_rate = COALESCE(?, resting_heart_rate),
                     respiratory_rate = COALESCE(?, respiratory_rate),
@@ -336,9 +358,45 @@ def pull_markers_from_json(metric_data, metric_name, cursor, markers_data_groupe
                     updated_at = ?
                 WHERE common_data_id = ?
             """, (
-                time_in_daylight, vo2_max, heart_rate, heart_rate_variability, resting_heart_rate,
-                respiratory_rate, blood_oxygen_saturation, body_mass_index, body_weight_lbs,
-                datetime.now().strftime("%Y-%m-%d %H:%M:%S"), common_data_id
+                marker_values.get("time_in_daylight_min"),
+                marker_values.get("vo2_max"),
+                marker_values.get("heart_rate_min"),
+                marker_values.get("heart_rate_max"),
+                marker_values.get("heart_rate_avg"),
+                marker_values.get("heart_rate_variability"),
+                marker_values.get("resting_heart_rate"),
+                marker_values.get("respiratory_rate"),
+                marker_values.get("blood_oxygen_saturation"),
+                marker_values.get("body_mass_index"),
+                marker_values.get("body_weight_lbs"),
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                common_data_id
+            ))
+        else:
+            # Debugging: Log the SQL insert query
+            #print(f"Inserting into health_markers: common_data_id={common_data_id}, time_in_daylight_min={marker_values.get('time_in_daylight')}")
+            cursor.execute("""
+                INSERT INTO health_markers (
+                    common_data_id, time_in_daylight_min, vo2_max, heart_rate_min, heart_rate_max, heart_rate_avg,
+                    heart_rate_variability, resting_heart_rate, respiratory_rate, blood_oxygen_saturation,
+                    body_mass_index, body_weight_lbs, created_at, updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                common_data_id,
+                marker_values.get("time_in_daylight_min"),
+                marker_values.get("vo2_max"),
+                marker_values.get("heart_rate_min"),
+                marker_values.get("heart_rate_max"),
+                marker_values.get("heart_rate_avg"),
+                marker_values.get("heart_rate_variability"),
+                marker_values.get("resting_heart_rate"),
+                marker_values.get("respiratory_rate"),
+                marker_values.get("blood_oxygen_saturation"),
+                marker_values.get("body_mass_index"),
+                marker_values.get("body_weight_lbs"),
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             ))
 
 def import_daily_data(data, conn):
@@ -353,18 +411,22 @@ def import_daily_data(data, conn):
     nutrition_data_grouped = {}
 
     markers_metrics = [
-        "time_in_daylight", "vo2_max", "heart_rate", "heart_rate_variability", "resting_heart_rate",
+        "time_in_daylight_min", "vo2_max", "heart_rate", "heart_rate_variability", "resting_heart_rate",
         "respiratory_rate", "blood_oxygen_saturation", "body_weight_lbs", "body_mass_index"]
     markers_data_grouped = {}
 
     # Import metrics data
     for metric in data.get("metrics", []):
         metric_name = metric.get("name")
+        print(f"Found metric: {metric_name}")
+
         metric_units = metric.get("units")
         metric_data = metric.get("data", [])
         # Translate metric name using the mapping
         metric_name = METRIC_NAME_MAPPING.get(metric_name, metric_name)
-        print(f"Mapped Metric Name: {metric_name}, Original Name: {metric.get('name')}")
+        print(f"Translated Metric Name: {metric_name}")
+        #print(f"Processing metric: {metric_name} with units: {metric_units}")
+        #print(f"Mapped Metric Name: {metric_name}, Original Name: {metric.get('name')}")
         insert_raw_data(cursor, metric_name, metric_units, metric_data)
         # Handle sleep_analysis specifically
         if metric_name == "sleep_analysis":
@@ -422,6 +484,65 @@ def import_historical_data(json_file_path, target_date=None):
     conn.close()
     print("Data import complete.")
 
+def insert_or_update_health_marker(session: Session, data: dict):
+    """
+    Inserts or updates a health marker record.
+    :param session: SQLAlchemy session object.
+    :param data: Dictionary containing health marker data.
+    """
+    # Check if a record with the same date and source already exists
+    existing_common_data = session.query(common_data).filter_by(
+        date=data['date'], source=data['source']
+    ).first()
+
+    if existing_common_data:
+        # Update the existing health marker record
+        session.query(health_markers_table).filter_by(
+            common_data_id=existing_common_data.common_data_id
+        ).update({
+            "heart_rate": data.get("heart_rate"),
+            "vo2_max": data.get("vo2_max"),
+            "body_weight_lbs": data.get("body_weight_lbs"),
+            "body_mass_index": data.get("body_mass_index"),
+            "respiratory_rate": data.get("respiratory_rate"),
+            "time_in_daylight_min": data.get("time_in_daylight_min"),
+            "heart_rate_variability": data.get("heart_rate_variability"),
+            "resting_heart_rate": data.get("resting_heart_rate"),
+            "blood_oxygen_saturation": data.get("blood_oxygen_saturation"),
+            "updated_at": data.get("updated_at"),
+        })
+    else:
+        # Insert a new record
+        try:
+            common_data_id = session.execute(
+                common_data.insert().values(
+                    date=data['date'],
+                    source=data['source']
+                ).returning(common_data.c.common_data_id)
+            ).scalar()
+
+            session.execute(
+                health_markers_table.insert().values(
+                    common_data_id=common_data_id,
+                    heart_rate=data.get("heart_rate"),
+                    vo2_max=data.get("vo2_max"),
+                    body_weight_lbs=data.get("body_weight_lbs"),
+                    body_mass_index=data.get("body_mass_index"),
+                    respiratory_rate=data.get("respiratory_rate"),
+                    time_in_daylight_min=data.get("time_in_daylight_min"),
+                    heart_rate_variability=data.get("heart_rate_variability"),
+                    resting_heart_rate=data.get("resting_heart_rate"),
+                    blood_oxygen_saturation=data.get("blood_oxygen_saturation"),
+                    created_at=data.get("created_at"),
+                    updated_at=data.get("updated_at"),
+                )
+            )
+        except IntegrityError:
+            session.rollback()
+            print("Duplicate entry detected. Skipping insert.")
+
+    session.commit()
+
 def import_historical_health_data(session: Session, health_data: list):
     """
     Imports historical health data into the database, aggregating by date.
@@ -439,45 +560,35 @@ def import_historical_health_data(session: Session, health_data: list):
                 "body_weight_lbs": [],
                 "body_mass_index": [],
                 "respiratory_rate": [],
-                "blood_oxygen_saturation": []
+                "blood_oxygen_saturation": [],
+                "resting_heart_rate": [],
+                "time_in_daylight_min": [],
+                "heart_rate_variability": [],
+                "source": record.get("source", "Unknown")  # Include source for uniqueness
             }
         for key in aggregated_data[date]:
-            if record.get(key) is not None:
+            if key != "source" and record.get(key) is not None:
                 aggregated_data[date][key].append(record[key])
 
     # Step 2: Calculate averages for each date
     for date, metrics in aggregated_data.items():
         aggregated_data[date] = {
             "date": date,
+            "source": metrics["source"],
             "heart_rate": sum(metrics["heart_rate"]) / len(metrics["heart_rate"]) if metrics["heart_rate"] else None,
             "vo2_max": sum(metrics["vo2_max"]) / len(metrics["vo2_max"]) if metrics["vo2_max"] else None,
             "body_weight_lbs": sum(metrics["body_weight_lbs"]) / len(metrics["body_weight_lbs"]) if metrics["body_weight_lbs"] else None,
             "body_mass_index": sum(metrics["body_mass_index"]) / len(metrics["body_mass_index"]) if metrics["body_mass_index"] else None,
             "respiratory_rate": sum(metrics["respiratory_rate"]) / len(metrics["respiratory_rate"]) if metrics["respiratory_rate"] else None,
             "blood_oxygen_saturation": sum(metrics["blood_oxygen_saturation"]) / len(metrics["blood_oxygen_saturation"]) if metrics["blood_oxygen_saturation"] else None,
+            "resting_heart_rate": sum(metrics["resting_heart_rate"]) / len(metrics["resting_heart_rate"]) if metrics["resting_heart_rate"] else None,
+            "time_in_daylight_min": sum(metrics["time_in_daylight_min"]) / len(metrics["time_in_daylight_min"]) if metrics["time_in_daylight_min"] else None,
+            "heart_rate_variability": sum(metrics["heart_rate_variability"]) / len(metrics["heart_rate_variability"]) if metrics["heart_rate_variability"] else None,
         }
 
     # Step 3: Insert aggregated data into the database
     for date, metrics in aggregated_data.items():
-        # Insert into common_data table
-        common_data_id = session.execute(
-            common_data.insert().values(date=metrics["date"]).returning(common_data.c.common_data_id)
-        ).scalar()
-
-        # Insert into health_markers_table
-        session.execute(
-            health_markers_table.insert().values(
-                common_data_id=common_data_id,
-                heart_rate=metrics["heart_rate"],
-                vo2_max=metrics["vo2_max"],
-                body_weight_lbs=metrics["body_weight_lbs"],
-                body_mass_index=metrics["body_mass_index"],
-                respiratory_rate=metrics["respiratory_rate"],
-                blood_oxygen_saturation=metrics["blood_oxygen_saturation"]
-            )
-        )
-
-    session.commit()
+        insert_or_update_health_marker(session, metrics)
 
 if __name__ == "__main__":
     # Import historical data

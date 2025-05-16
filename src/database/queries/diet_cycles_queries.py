@@ -1,6 +1,6 @@
 from sqlalchemy import select, and_, or_
 from sqlalchemy.orm import Session
-from datetime import date  # Import `date` for date operations
+from datetime import date, datetime  # Import `date` for date operations and `datetime` for timestamps
 from src.database.schema import diet_cycles_table, diet_weeks_table, common_data  # Import the `common_data` table
 from src.database.connection import engine  # Assuming `engine` is defined in a connection module
 import pandas as pd  # Import pandas for CSV operations
@@ -8,6 +8,9 @@ import os  # Import os for file path operations
 
 # Initialize the database session
 db = Session(bind=engine)
+
+DIET_CYCLES_CSV_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../data/diet_cycles.csv"))
+DIET_WEEKS_CSV_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../data/diet_weeks.csv"))
 
 def query_insert_diet_cycle(start_date, cycle_type, end_date=None, notes=None):
     return db.execute(
@@ -80,7 +83,6 @@ def update_diet_weeks_csv():
             diet_weeks_table.c.common_data_id,
             diet_weeks_table.c.week_start_date,
             diet_weeks_table.c.calorie_target,
-            common_data.c.date.label("common_data_date"),  # Include common_data.date
             common_data.c.source.label("common_data_source")  # Include common_data.source
         ).join(
             common_data, diet_weeks_table.c.common_data_id == common_data.c.common_data_id
@@ -93,15 +95,14 @@ def update_diet_weeks_csv():
         # Convert result to DataFrame
         df = pd.DataFrame(result, columns=[
             "week_id", "cycle_id", "common_data_id", "week_start_date", "calorie_target", 
-            "common_data_date", "common_data_source"
+            "common_data_source"
         ])
-        csv_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../data/diet_weeks.csv"))  # Updated path
 
         # Write to CSV
-        df.to_csv(csv_path, index=False)
+        df.to_csv(DIET_WEEKS_CSV_FILE, index=False)
 
         # Debugging: Log successful CSV update
-        print(f"Debug: CSV updated successfully at {csv_path}.")
+        print(f"Debug: CSV updated successfully at {DIET_WEEKS_CSV_FILE}.")
     except Exception as e:
         # Debugging: Log any errors during the CSV update process
         print(f"Error updating diet_weeks.csv: {e}")
@@ -112,19 +113,23 @@ def query_insert_diet_week(cycle_id, week_start_date, calorie_target, source=Non
         # Generate a common_data_id
         common_data_id = query_insert_common_data(date=week_start_date, source=source)
 
-        # Insert into diet_weeks_table
+        # Insert into diet_weeks_table with timestamps
+        current_time = datetime.utcnow()
         db.execute(
             diet_weeks_table.insert().values(
                 cycle_id=cycle_id,
-                common_data_id=common_data_id,  # Include the generated common_data_id
+                common_data_id=common_data_id,
                 week_start_date=week_start_date,
-                calorie_target=calorie_target
+                calorie_target=calorie_target,
+                source=source,  # Ensure source is populated
+                created_at=current_time,
+                updated_at=current_time
             )
         )
         db.commit()  # Ensure changes are committed to the database
 
         # Debugging: Log successful insertion
-        print(f"Debug: Inserted diet week with cycle_id={cycle_id}, week_start_date={week_start_date}, calorie_target={calorie_target}.")
+        print(f"Debug: Inserted diet week with cycle_id={cycle_id}, week_start_date={week_start_date}, calorie_target={calorie_target}, source={source}.")
 
         # Update the diet_weeks.csv file
         update_diet_weeks_csv()

@@ -1,0 +1,23 @@
+SELECT 
+    cd.date AS Date,
+    MAX(hm.time_in_daylight_min) AS "Time in Daylight (min)",
+    MAX(hm.vo2_max) AS "VO2 Max",
+    MAX(hm.heart_rate_min) AS "Heart Rate Min",
+    MAX(hm.heart_rate_max) AS "Heart Rate Max",
+    MAX(hm.heart_rate_avg) AS "Heart Rate Avg",
+    MAX(hm.heart_rate_variability) AS "Heart Rate Variability",
+    MAX(hm.resting_heart_rate) AS "Resting Heart Rate",
+    MAX(hm.respiratory_rate) AS "Respiratory Rate",
+    MAX(hm.blood_oxygen_saturation) AS "Blood Oxygen Saturation",
+    MAX(hm.body_weight_lbs) AS "Body Weight (lbs)",
+    MAX(hm.body_mass_index) AS "BMI"
+FROM 
+    health_markers hm
+JOIN 
+    common_data cd ON hm.common_data_id = cd.common_data_id
+WHERE 
+    cd.date >= DATE('now', '-30 days')
+GROUP BY 
+    cd.date
+ORDER BY 
+    cd.date DESC;

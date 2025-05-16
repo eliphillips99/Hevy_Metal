@@ -10,6 +10,10 @@ project_root = os.path.abspath(os.path.join(current_dir, "../../"))
 if project_root not in sys.path:
     sys.path.append(project_root)
 
+DIET_CYCLES_CSV_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../data/diet_cycles.csv"))
+DIET_WEEKS_CSV_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../data/diet_weeks.csv"))
+
+
 from src.database.queries.hevy_sql_queries import (
     query_get_all_workouts,
     query_get_exercises_in_workout,
@@ -34,7 +38,20 @@ db = Session(bind=engine)
 
 def set_query_params(**params):
     """Helper function to set query parameters."""
-    st.experimental_set_query_params(**params)  # Use experimental method for now
+    st.query_params(**params)  # Updated to use st.query_params
+
+'''def append_to_diet_weeks_csv(cycle_id, week_id, week_start_date, calorie_target, source):
+    """Append a new diet week to the CSV file."""
+
+    weeks_pd = pd.read_csv(DIET_WEEKS_CSV_FILE)
+    new_row = {
+        "cycle_id": cycle_id,
+        "week_id": week_id,
+        "week_start_date": week_start_date,
+        "calorie_target": calorie_target,
+        "common_data_source": source
+    }
+    '''
 
 # Sidebar navigation
 st.sidebar.title("Navigation")
@@ -132,15 +149,30 @@ elif page == "Data Input":
     with st.form("add_diet_week_form"):
         week_start_date = st.date_input("Week Start Date", date.today())
         calorie_target = st.number_input("Calorie Target", value=0.0, step=1.0)
-        source = st.text_input("Source (optional)")
+        source = 'streamlit form'
         submitted_week = st.form_submit_button("Add Week")
         if submitted_week:
             current_cycle = query_get_current_diet_cycle()
             if current_cycle:
                 cycle_id = current_cycle.cycle_id
-                query_insert_diet_week(cycle_id, week_start_date, calorie_target)
-                st.success("Diet week added successfully.")
-                set_query_params(page="Data Input")  # Use helper function
+
+                # Check if the common_data entry already exists
+                existing_common_data = db.execute(
+                    "SELECT common_data_id FROM common_data WHERE date = :date AND source = :source",
+                    {"date": week_start_date.strftime("%Y-%m-%d %H:%M:%S"), "source": source}
+                ).fetchone()
+
+                if existing_common_data:
+                    st.error("A diet week with the same date and source already exists.")
+                else:
+                    query_insert_diet_week(
+                        cycle_id=cycle_id,
+                        week_start_date=week_start_date,
+                        calorie_target=calorie_target,
+                        source=source
+                    )
+                    st.success("Diet week added successfully.")
+                    set_query_params(page="Data Input")  # Use helper function
             else:
                 st.error("No ongoing diet cycle found. Please start a new cycle first.")
 
