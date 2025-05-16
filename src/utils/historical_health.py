@@ -250,6 +250,16 @@ def pull_markers_from_json(metric_data, metric_name, cursor, markers_data_groupe
     for entry in metric_data:
         date = entry.get("date")
         source = entry.get("source", "Unknown")
+        qty = entry.get("qty")  # Extract the qty field
+
+        # Debugging: Log the raw entry being processed
+        if metric_name == "time_in_daylight":
+            print(f"Raw entry for time_in_daylight: {entry}")
+
+        # Ensure qty is extracted correctly
+        if metric_name == "time_in_daylight" and qty is None:
+            print(f"Warning: Missing 'qty' for time_in_daylight in entry: {entry}")
+            continue
 
         # Handle heart rate separately to extract Min, Max, and Avg
         if metric_name == "heart_rate":
@@ -258,11 +268,15 @@ def pull_markers_from_json(metric_data, metric_name, cursor, markers_data_groupe
             avg_val = entry.get("Avg")
         else:
             min_val = max_val = None
-            avg_val = entry.get("qty")  # Initialize avg_val for non-heart_rate metrics
+            avg_val = qty  # Use qty for non-heart_rate metrics
+
+        # Debugging: Log the extracted qty value
+        if metric_name == "time_in_daylight":
+            print(f"Extracted qty for time_in_daylight: {qty}")
 
         # Check if date or avg_val is missing
         if not date or avg_val is None:
-            print(f"Warning: Missing 'date' or 'avg' for {metric_name} in entry: {entry}")
+            print(f"Warning: Missing 'date' or 'qty' for {metric_name} in entry: {entry}")
             continue
 
         # Convert date to a datetime object
@@ -292,8 +306,14 @@ def pull_markers_from_json(metric_data, metric_name, cursor, markers_data_groupe
             markers_data_grouped[key]["heart_rate_min"] = min_val
             markers_data_grouped[key]["heart_rate_max"] = max_val
             markers_data_grouped[key]["heart_rate_avg"] = avg_val
+        elif metric_name == "time_in_daylight":
+            markers_data_grouped[key]["time_in_daylight"] = avg_val  # Assign qty to time_in_daylight
         else:
             markers_data_grouped[key][metric_name] = avg_val
+
+    # Debugging: Log grouped data for time_in_daylight
+    if metric_name == "time_in_daylight":
+        print(f"Grouped data for time_in_daylight: {markers_data_grouped}")
 
     for (date, source), marker_values in markers_data_grouped.items():
         # Skip entries where all marker values are None
@@ -310,6 +330,9 @@ def pull_markers_from_json(metric_data, metric_name, cursor, markers_data_groupe
         # Get or create the common_data_id
         common_data_id = get_or_create_common_data_id(cursor, timestamp, source)
 
+        # Debugging: Log the values being updated or inserted
+        print(f"Preparing to update/insert for common_data_id={common_data_id}, time_in_daylight_min={marker_values.get('time_in_daylight')}")
+
         # Check if a row already exists for this common_data_id
         cursor.execute("""
             SELECT * FROM health_markers WHERE common_data_id = ?
@@ -317,7 +340,8 @@ def pull_markers_from_json(metric_data, metric_name, cursor, markers_data_groupe
         existing_row = cursor.fetchone()
 
         if existing_row:
-            # Update the existing row with non-null values
+            # Debugging: Log the SQL update query
+            print(f"Updating health_markers for common_data_id={common_data_id}, time_in_daylight_min={marker_values.get('time_in_daylight')}")
             cursor.execute("""
                 UPDATE health_markers
                 SET time_in_daylight_min = COALESCE(?, time_in_daylight_min),
@@ -349,7 +373,8 @@ def pull_markers_from_json(metric_data, metric_name, cursor, markers_data_groupe
                 common_data_id
             ))
         else:
-            # Insert a new row
+            # Debugging: Log the SQL insert query
+            print(f"Inserting into health_markers: common_data_id={common_data_id}, time_in_daylight_min={marker_values.get('time_in_daylight')}")
             cursor.execute("""
                 INSERT INTO health_markers (
                     common_data_id, time_in_daylight_min, vo2_max, heart_rate_min, heart_rate_max, heart_rate_avg,
