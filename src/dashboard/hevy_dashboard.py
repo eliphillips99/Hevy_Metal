@@ -107,8 +107,8 @@ elif page == "Health Markers":
 
     if health_markers:
         column_names = [
-            "Date", "Heart Rate", "VO2 Max", "Body Weight (lbs)", "BMI",
-            "Respiratory Rate", "Blood Oxygen Saturation"
+            "Date", "Heart Rate Avg", "Heart Rate Min", "Heart Rate Max", "VO2 Max", "Body Weight (lbs)", "BMI",
+            "Respiratory Rate", "Blood Oxygen Saturation", "Time in Daylight (min)"
         ]
         df_health = pd.DataFrame(health_markers, columns=column_names)
         st.dataframe(df_health)

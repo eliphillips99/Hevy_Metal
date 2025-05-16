@@ -17,7 +17,8 @@ def query_get_health_markers(start_date=None, end_date=None):
         health_markers_table.c.body_weight_lbs.label("Body Weight (lbs)"),
         health_markers_table.c.body_mass_index.label("BMI"),
         health_markers_table.c.respiratory_rate.label("Respiratory Rate"),
-        health_markers_table.c.blood_oxygen_saturation.label("Blood Oxygen Saturation")
+        health_markers_table.c.blood_oxygen_saturation.label("Blood Oxygen Saturation"),
+        health_markers_table.c.time_in_daylight_min.label("Time in Daylight (min)")
     ).join(
         common_data, health_markers_table.c.common_data_id == common_data.c.common_data_id
     ).order_by(
