@@ -177,3 +177,4 @@ def query_insert_diet_week(cycle_id, week_start_date, calorie_target, source=Non
 def query_get_diet_weeks(diet_cycle_id):
     query = select(diet_weeks_table).where(diet_weeks_table.c.diet_cycle_id == diet_cycle_id)
     return db.execute(query).fetchall()
+    return db.execute(query).fetchall()
