@@ -181,6 +181,30 @@ elif page == "Sleep":
     else:
         st.info("No sleep data found for the selected date range.")
 
+    sleep_percentages = query_get_sleep_cycle_percentages(start_date=start_date, end_date=end_date)
+    if sleep_percentages:
+        # Extract percentages from the query result
+        avg_rem, avg_deep, avg_core, avg_awake = sleep_percentages
+
+        # Prepare data for the pie chart
+        pie_chart_data = pd.DataFrame({
+            "Sleep Stage": ["REM Sleep", "Deep Sleep", "Core Sleep", "Awake Time"],
+            "Average Percentage (%)": [avg_rem, avg_deep, avg_core, avg_awake]
+        })
+
+        # Create a pie chart
+        pie_chart = alt.Chart(pie_chart_data).mark_arc().encode(
+            theta=alt.Theta(field="Average Percentage (%)", type="quantitative"),
+            color=alt.Color(field="Sleep Stage", type="nominal"),
+            tooltip=["Sleep Stage", "Average Percentage (%)"]
+        ).properties(
+            title="Average Sleep Stage Distribution (%)"
+        )
+
+        st.altair_chart(pie_chart, use_container_width=True)
+    else:
+        st.info("No sleep percentage data available for the selected date range.")
+
 elif page == "Health Markers":
     
     start_date = st.sidebar.date_input("Start Date", value=date(2025, 1, 1))
