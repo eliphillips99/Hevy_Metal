@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from datetime import date
+from datetime import date, timedelta
 import sys
 import os
 import altair as alt
@@ -59,10 +59,29 @@ def set_query_params(**params):
 st.sidebar.title("Navigation")
 page = st.sidebar.radio("Go to", ["Workouts", "Nutrition", "Sleep", "Health Markers", "Diet Cycles", "Data Input"])
 
+# Add quick access buttons for date ranges
+st.sidebar.title("Quick Date Range")
+today = date.today()
+quick_ranges = {
+    "Current Day": (today, today),
+    "Last Week": (today - timedelta(days=7), today),
+    "Last Month": (today - timedelta(days=30), today),
+    "Last 3 Months": (today - timedelta(days=90), today),
+    "Last 6 Months": (today - timedelta(days=180), today),
+    "Last Year": (today - timedelta(days=365), today),
+    "All Time": (date(2023, 6, 1), today)  # Data starts from June 2023
+}
+
+selected_range = st.sidebar.radio("Select Date Range", list(quick_ranges.keys()))
+start_date, end_date = quick_ranges[selected_range]
+
+# Allow manual override of the date range
+st.sidebar.title("Custom Date Range")
+start_date = st.sidebar.date_input("Start Date", value=start_date)
+end_date = st.sidebar.date_input("End Date", value=end_date)
+
 if page == "Workouts":
     st.title("Workout Counts")
-    start_date = st.sidebar.date_input("Start Date", value=date(2025, 1, 1))
-    end_date = st.sidebar.date_input("End Date", value=date.today())
     workouts = query_get_all_workouts(start_date=start_date, end_date=end_date)
     if workouts:
         df_workouts = pd.DataFrame(workouts, columns=["Workout ID", "Title", "Start Time", "End Time"])
@@ -72,8 +91,6 @@ if page == "Workouts":
 
 elif page == "Nutrition":
     st.title("Protein Per Day")
-    start_date = st.sidebar.date_input("Start Date", value=date(2025, 1, 1))
-    end_date = st.sidebar.date_input("End Date", value=date.today())
     nutrition_data = query_get_nutrition_data(start_date=start_date, end_date=end_date)
 
     if nutrition_data:
@@ -142,8 +159,6 @@ elif page == "Nutrition":
 
 elif page == "Sleep":
     st.title("Sleep Analysis")
-    start_date = st.sidebar.date_input("Start Date", value=date(2025, 1, 1))
-    end_date = st.sidebar.date_input("End Date", value=date.today())
     sleep_data = query_get_sleep_data(start_date=start_date, end_date=end_date)
 
     if sleep_data:
@@ -207,9 +222,6 @@ elif page == "Sleep":
 
 elif page == "Health Markers":
     
-    start_date = st.sidebar.date_input("Start Date", value=date(2025, 1, 1))
-    end_date = st.sidebar.date_input("End Date", value=date.today())
-
     st.title("Daily Health Markers")
     # Use the new aggregated query
     health_markers = query_get_aggregated_health_markers(start_date=start_date, end_date=end_date)
