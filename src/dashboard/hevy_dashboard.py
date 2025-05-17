@@ -23,7 +23,10 @@ from src.database.queries.hevy_sql_queries import (
 )
 from src.database.queries.sleep_queries import query_get_sleep_data
 from src.database.queries.nutrition_queries import query_get_nutrition_data
-from src.database.queries.health_markers_queries import query_get_health_markers
+from src.database.queries.health_markers_queries import (
+    query_get_health_markers,
+    query_get_aggregated_health_markers
+)
 from src.database.queries.diet_cycles_queries import (
     query_get_current_diet_cycle,
     query_get_all_diet_cycles,
@@ -103,7 +106,9 @@ elif page == "Health Markers":
     st.title("Daily Health Markers")
     start_date = st.sidebar.date_input("Start Date", value=date(2025, 1, 1))
     end_date = st.sidebar.date_input("End Date", value=date.today())
-    health_markers = query_get_health_markers(start_date=start_date, end_date=end_date)
+
+    # Use the new aggregated query
+    health_markers = query_get_aggregated_health_markers(start_date=start_date, end_date=end_date)
 
     if health_markers:
         column_names = [

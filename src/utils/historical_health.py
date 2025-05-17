@@ -322,6 +322,12 @@ def pull_markers_from_json(metric_data, metric_name, cursor, markers_data_groupe
         # Get or create the common_data_id
         common_data_id = get_or_create_common_data_id(cursor, timestamp, source)
 
+        # Debugging: Print the data point before adding it to the database
+        print(f"Preparing to insert/update health marker row:")
+        print(f"  Date: {timestamp}")
+        print(f"  Source: {source}")
+        print(f"  Values: {marker_values}")
+
         # Check if a row already exists for this common_data_id
         cursor.execute("""
             SELECT * FROM health_markers WHERE common_data_id = ?
