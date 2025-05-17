@@ -34,6 +34,7 @@ from src.database.queries.diet_cycles_queries import (
     query_insert_diet_week
 )
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 from src.database.connection import engine
 
 # Create a database session
@@ -41,7 +42,7 @@ db = Session(bind=engine)
 
 def set_query_params(**params):
     """Helper function to set query parameters."""
-    st.query_params(**params)  # Updated to use st.query_params
+    st.experimental_set_query_params(**params)  # Use the correct Streamlit function
 
 '''def append_to_diet_weeks_csv(cycle_id, week_id, week_start_date, calorie_target, source):
     """Append a new diet week to the CSV file."""
@@ -126,7 +127,7 @@ elif page == "Diet Cycles":
     if diet_cycles:
         column_names = [
             "Cycle ID", "Common Data ID", "Start Date", "End Date", "Cycle Type",
-            "Gain Rate (lbs/week)", "Loss Rate (lbs/week)", "Notes", "Created At", "Updated At"
+            "Gain Rate (lbs/week)", "Loss Rate (lbs/week)", "Source", "Notes", "Created At", "Updated At"
         ]
         df_cycles = pd.DataFrame(diet_cycles, columns=column_names)
         st.dataframe(df_cycles)
@@ -163,7 +164,7 @@ elif page == "Data Input":
 
                 # Check if the common_data entry already exists
                 existing_common_data = db.execute(
-                    "SELECT common_data_id FROM common_data WHERE date = :date AND source = :source",
+                    text("SELECT common_data_id FROM common_data WHERE date = :date AND source = :source"),
                     {"date": week_start_date.strftime("%Y-%m-%d %H:%M:%S"), "source": source}
                 ).fetchone()
 
