@@ -24,11 +24,7 @@ from src.database.queries.hevy_sql_queries import (
 )
 from src.database.queries.sleep_queries import query_get_sleep_data
 from src.database.queries.nutrition_queries import query_get_nutrition_data
-from src.database.queries.health_markers_queries import (
-    query_get_health_markers,
-    query_get_aggregated_health_markers,
-    query_get_body_weight_over_time
-)
+from src.database.queries.health_markers_queries import *
 from src.database.queries.diet_cycles_queries import (
     query_get_current_diet_cycle,
     query_get_all_diet_cycles,
@@ -127,18 +123,34 @@ elif page == "Health Markers":
     st.title("Body Weight Over Time")
 
     body_weight = query_get_body_weight_over_time(start_date=start_date, end_date=end_date)
+    cycle_start_dates = query_get_all_diet_cycles(start_date=start_date, end_date=end_date)
+
+    if cycle_start_dates:
+        df_diet_cycles = pd.DataFrame(cycle_start_dates, columns=[
+        "Cycle ID", "Common Data ID", "Start Date", "End Date", "Cycle Type", 
+        "Gain Rate", "Loss Rate", "Source", "Notes", "Created At", "Updated At"])
+        start_dates = df_diet_cycles["Start Date"]
+        cycle_types = df_diet_cycles["Cycle Type"]
 
     if body_weight:
         column_names = ["Date", "Body Weight (lbs)"]
         df_body_weight = pd.DataFrame(body_weight, columns=column_names)
+
         
-        chart = alt.Chart(df_body_weight).mark_line().encode(
+        body_weight_chart = alt.Chart(df_body_weight).mark_line().encode(
             x=alt.X('Date:T', title='Date'),
             y=alt.Y('Body Weight (lbs):Q', title='Body Weight (lbs)', scale=alt.Scale(domain=[df_body_weight['Body Weight (lbs)'].min()-5, df_body_weight['Body Weight (lbs)'].max()+10])),
         ).properties(
             title='Body Weight Over Time'
         )
-        st.altair_chart(chart, use_container_width=True)
+        cycle_chart = alt.Chart(df_diet_cycles).mark_bar(size=5).encode(
+            x=alt.X('Start Date:T', title='Diet Cycle Start Date'),
+            color=alt.Color('Cycle Type:N', title='Cycle Type', scale=alt.Scale(domain=['bulk', 'cut', 'maintenance'], range=['yellow', 'red', 'orange'])),
+            tooltip=['Start Date:T', 'End Date:T', 'Cycle Type:N', 'Gain Rate:Q', 'Loss Rate:Q']
+        )
+
+        combined_chart = body_weight_chart + cycle_chart
+        st.altair_chart(combined_chart, use_container_width=True)
     else:
         st.info("No body weight data found for the selected date range.")
 
