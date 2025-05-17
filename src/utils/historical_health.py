@@ -254,9 +254,9 @@ def pull_markers_from_json(metric_data, metric_name, cursor, markers_data_groupe
         qty = entry.get("qty")  # Extract the qty field
 
         # Debugging: Log the raw entry being processed
-        if metric_name == "time_in_daylight_min":
-            print(f"Raw entry for time_in_daylight: {entry}")
-            print(f"Grouped data for time_in_daylight before database operation: {markers_data_grouped}")
+        #if metric_name == "time_in_daylight_min":
+            #print(f"Raw entry for time_in_daylight: {entry}")
+            #print(f"Grouped data for time_in_daylight before database operation: {markers_data_grouped}")
 
         # Ensure qty is extracted correctly
         if metric_name == "time_in_daylight_min" and qty is None:
@@ -271,10 +271,6 @@ def pull_markers_from_json(metric_data, metric_name, cursor, markers_data_groupe
         else:
             min_val = max_val = None
             avg_val = qty  # Use qty for non-heart_rate metrics
-
-        # Debugging: Log the extracted qty value
-        if metric_name == "time_in_daylight_min":
-            print(f"Extracted qty for time_in_daylight: {qty}")
 
         # Check if date or avg_val is missing
         if not date or avg_val is None:
@@ -311,10 +307,6 @@ def pull_markers_from_json(metric_data, metric_name, cursor, markers_data_groupe
         else:
             markers_data_grouped[key][metric_name] = avg_val
 
-    # Debugging: Log grouped data for time_in_daylight
-    if metric_name == "time_in_daylight_min":
-        print(f"Grouped data for time_in_daylight: {markers_data_grouped}")
-
     for (date, source), marker_values in markers_data_grouped.items():
         # Skip entries where all marker values are None
         if all(value is None for value in marker_values.values()):
@@ -330,9 +322,6 @@ def pull_markers_from_json(metric_data, metric_name, cursor, markers_data_groupe
         # Get or create the common_data_id
         common_data_id = get_or_create_common_data_id(cursor, timestamp, source)
 
-        # Debugging: Log the values being updated or inserted
-        #print(f"Preparing to update/insert for common_data_id={common_data_id}, time_in_daylight_min={marker_values.get('time_in_daylight')}")
-
         # Check if a row already exists for this common_data_id
         cursor.execute("""
             SELECT * FROM health_markers WHERE common_data_id = ?
@@ -340,8 +329,7 @@ def pull_markers_from_json(metric_data, metric_name, cursor, markers_data_groupe
         existing_row = cursor.fetchone()
 
         if existing_row:
-            # Debugging: Log the SQL update query
-            #print(f"Updating health_markers for common_data_id={common_data_id}, time_in_daylight_min={marker_values.get('time_in_daylight')}")
+            # Update the existing row by aggregating values
             cursor.execute("""
                 UPDATE health_markers
                 SET time_in_daylight_min = COALESCE(?, time_in_daylight_min),
@@ -373,8 +361,7 @@ def pull_markers_from_json(metric_data, metric_name, cursor, markers_data_groupe
                 common_data_id
             ))
         else:
-            # Debugging: Log the SQL insert query
-            #print(f"Inserting into health_markers: common_data_id={common_data_id}, time_in_daylight_min={marker_values.get('time_in_daylight')}")
+            # Insert a new row
             cursor.execute("""
                 INSERT INTO health_markers (
                     common_data_id, time_in_daylight_min, vo2_max, heart_rate_min, heart_rate_max, heart_rate_avg,
@@ -555,7 +542,9 @@ def import_historical_health_data(session: Session, health_data: list):
         date = record["date"]
         if date not in aggregated_data:
             aggregated_data[date] = {
-                "heart_rate": [],
+                "heart_rate_min": [],
+                "heart_rate_max": [],
+                "heart_rate_avg": [],
                 "vo2_max": [],
                 "body_weight_lbs": [],
                 "body_mass_index": [],
@@ -575,7 +564,9 @@ def import_historical_health_data(session: Session, health_data: list):
         aggregated_data[date] = {
             "date": date,
             "source": metrics["source"],
-            "heart_rate": sum(metrics["heart_rate"]) / len(metrics["heart_rate"]) if metrics["heart_rate"] else None,
+            "heart_rate_min": min(metrics["heart_rate_min"]) if metrics["heart_rate_min"] else None,
+            "heart_rate_max": max(metrics["heart_rate_max"]) if metrics["heart_rate_max"] else None,
+            "heart_rate_avg": sum(metrics["heart_rate_avg"]) / len(metrics["heart_rate_avg"]) if metrics["heart_rate_avg"] else None,
             "vo2_max": sum(metrics["vo2_max"]) / len(metrics["vo2_max"]) if metrics["vo2_max"] else None,
             "body_weight_lbs": sum(metrics["body_weight_lbs"]) / len(metrics["body_weight_lbs"]) if metrics["body_weight_lbs"] else None,
             "body_mass_index": sum(metrics["body_mass_index"]) / len(metrics["body_mass_index"]) if metrics["body_mass_index"] else None,
