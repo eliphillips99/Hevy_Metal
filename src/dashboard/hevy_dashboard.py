@@ -23,7 +23,10 @@ from src.database.queries.hevy_sql_queries import (
 )
 from src.database.queries.sleep_queries import query_get_sleep_data
 from src.database.queries.nutrition_queries import query_get_nutrition_data
-from src.database.queries.health_markers_queries import query_get_health_markers
+from src.database.queries.health_markers_queries import (
+    query_get_health_markers,
+    query_get_aggregated_health_markers
+)
 from src.database.queries.diet_cycles_queries import (
     query_get_current_diet_cycle,
     query_get_all_diet_cycles,
@@ -31,6 +34,7 @@ from src.database.queries.diet_cycles_queries import (
     query_insert_diet_week
 )
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 from src.database.connection import engine
 
 # Create a database session
@@ -38,7 +42,7 @@ db = Session(bind=engine)
 
 def set_query_params(**params):
     """Helper function to set query parameters."""
-    st.query_params(**params)  # Updated to use st.query_params
+    st.experimental_set_query_params(**params)  # Use the correct Streamlit function
 
 '''def append_to_diet_weeks_csv(cycle_id, week_id, week_start_date, calorie_target, source):
     """Append a new diet week to the CSV file."""
@@ -103,7 +107,9 @@ elif page == "Health Markers":
     st.title("Daily Health Markers")
     start_date = st.sidebar.date_input("Start Date", value=date(2025, 1, 1))
     end_date = st.sidebar.date_input("End Date", value=date.today())
-    health_markers = query_get_health_markers(start_date=start_date, end_date=end_date)
+
+    # Use the new aggregated query
+    health_markers = query_get_aggregated_health_markers(start_date=start_date, end_date=end_date)
 
     if health_markers:
         column_names = [
@@ -121,7 +127,7 @@ elif page == "Diet Cycles":
     if diet_cycles:
         column_names = [
             "Cycle ID", "Common Data ID", "Start Date", "End Date", "Cycle Type",
-            "Gain Rate (lbs/week)", "Loss Rate (lbs/week)", "Notes", "Created At", "Updated At"
+            "Gain Rate (lbs/week)", "Loss Rate (lbs/week)", "Source", "Notes", "Created At", "Updated At"
         ]
         df_cycles = pd.DataFrame(diet_cycles, columns=column_names)
         st.dataframe(df_cycles)
@@ -158,7 +164,7 @@ elif page == "Data Input":
 
                 # Check if the common_data entry already exists
                 existing_common_data = db.execute(
-                    "SELECT common_data_id FROM common_data WHERE date = :date AND source = :source",
+                    text("SELECT common_data_id FROM common_data WHERE date = :date AND source = :source"),
                     {"date": week_start_date.strftime("%Y-%m-%d %H:%M:%S"), "source": source}
                 ).fetchone()
 
