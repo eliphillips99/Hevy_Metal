@@ -93,6 +93,31 @@ elif page == "Nutrition":
     st.title("Protein Per Day")
     nutrition_data = query_get_nutrition_data(start_date=start_date, end_date=end_date)
 
+    # Hardcoded protein target values
+    protein_target_min = 145  # Minimum protein target
+    protein_target_max = 180  # Maximum protein target
+
+    # Create a DataFrame for the target lines
+    target_lines_df = pd.DataFrame({
+        'Protein Target': [protein_target_min, protein_target_max],
+        'Target Type': ['Min', 'Max']
+    })
+
+    # Add horizontal dotted lines for the protein targets
+    target_lines = alt.Chart(target_lines_df).mark_rule(
+        strokeDash=[5, 5],  # Dotted line
+        color='green',
+        size=2  # Thicker line
+    ).encode(
+        y=alt.Y('Protein Target:Q', title='Protein Target'),
+        tooltip=['Target Type:N', 'Protein Target:Q']  # Add tooltips for the target lines
+    )
+
+    # Ensure the start_date and end_date are datetime objects
+    start_date = pd.to_datetime(start_date)
+    end_date = pd.to_datetime(end_date)
+
+    # Filter data based on the selected date range
     if nutrition_data:
         column_names = ["Date", "Protein (g)", "Calories", "Carbohydrates (g)", "Fat (g)"]
         df_nutrition = pd.DataFrame(nutrition_data, columns=column_names)
@@ -100,31 +125,6 @@ elif page == "Nutrition":
         # Convert the Date column to datetime format
         df_nutrition['Date'] = pd.to_datetime(df_nutrition['Date'])
 
-        # Hardcoded protein target values
-        protein_target_min = 145  # Minimum protein target
-        protein_target_max = 180  # Maximum protein target
-
-        # Create a DataFrame for the target lines
-        target_lines_df = pd.DataFrame({
-            'Protein Target': [protein_target_min, protein_target_max],
-            'Target Type': ['Min', 'Max']
-        })
-
-        # Add horizontal dotted lines for the protein targets
-        target_lines = alt.Chart(target_lines_df).mark_rule(
-            strokeDash=[5, 5],  # Dotted line
-            color='green',
-            size=2  # Thicker line
-        ).encode(
-            y=alt.Y('Protein Target:Q', title='Protein Target'),
-            tooltip=['Target Type:N', 'Protein Target:Q']  # Add tooltips for the target lines
-        )
-
-        # Ensure the start_date and end_date are datetime objects
-        start_date = pd.to_datetime(start_date)
-        end_date = pd.to_datetime(end_date)
-
-        # Filter data based on the selected date range
         filtered_data = df_nutrition[(df_nutrition['Date'] >= start_date) & 
                                      (df_nutrition['Date'] <= end_date)]
 
@@ -243,29 +243,35 @@ elif page == "Health Markers":
 
     if cycle_start_dates:
         df_diet_cycles = pd.DataFrame(cycle_start_dates, columns=[
-        "Cycle ID", "Common Data ID", "Start Date", "End Date", "Cycle Type", 
-        "Gain Rate", "Loss Rate", "Source", "Notes", "Created At", "Updated At"])
+            "Cycle ID", "Common Data ID", "Start Date", "End Date", "Cycle Type", 
+            "Gain Rate", "Loss Rate", "Source", "Notes", "Created At", "Updated At"
+        ])
         start_dates = df_diet_cycles["Start Date"]
         cycle_types = df_diet_cycles["Cycle Type"]
+    else:
+        df_diet_cycles = None  # Ensure df_diet_cycles is defined
 
     if body_weight:
         column_names = ["Date", "Body Weight (lbs)"]
         df_body_weight = pd.DataFrame(body_weight, columns=column_names)
 
-        
         body_weight_chart = alt.Chart(df_body_weight).mark_line().encode(
             x=alt.X('Date:T', title='Date'),
             y=alt.Y('Body Weight (lbs):Q', title='Body Weight (lbs)', scale=alt.Scale(domain=[df_body_weight['Body Weight (lbs)'].min()-5, df_body_weight['Body Weight (lbs)'].max()+10])),
         ).properties(
             title='Body Weight Over Time'
         )
-        cycle_chart = alt.Chart(df_diet_cycles).mark_bar(size=5).encode(
-            x=alt.X('Start Date:T', title='Diet Cycle Start Date'),
-            color=alt.Color('Cycle Type:N', title='Cycle Type', scale=alt.Scale(domain=['bulk', 'cut', 'maintenance'], range=['yellow', 'red', 'orange'])),
-            tooltip=['Start Date:T', 'End Date:T', 'Cycle Type:N', 'Gain Rate:Q', 'Loss Rate:Q']
-        )
 
-        combined_chart = body_weight_chart + cycle_chart
+        if df_diet_cycles is not None and not df_diet_cycles.empty:
+            cycle_chart = alt.Chart(df_diet_cycles).mark_bar(size=5).encode(
+                x=alt.X('Start Date:T', title='Diet Cycle Start Date'),
+                color=alt.Color('Cycle Type:N', title='Cycle Type', scale=alt.Scale(domain=['bulk', 'cut', 'maintenance'], range=['yellow', 'red', 'orange'])),
+                tooltip=['Start Date:T', 'End Date:T', 'Cycle Type:N', 'Gain Rate:Q', 'Loss Rate:Q']
+            )
+            combined_chart = body_weight_chart + cycle_chart
+        else:
+            combined_chart = body_weight_chart
+
         st.altair_chart(combined_chart, use_container_width=True)
     else:
         st.info("No body weight data found for the selected date range.")
