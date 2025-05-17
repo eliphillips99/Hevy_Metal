@@ -22,7 +22,7 @@ from src.database.queries.hevy_sql_queries import (
     query_get_all_unique_exercise_names,
     query_get_exercise_counts
 )
-from src.database.queries.sleep_queries import query_get_sleep_data
+from src.database.queries.sleep_queries import *
 from src.database.queries.nutrition_queries import query_get_nutrition_data
 from src.database.queries.health_markers_queries import *
 from src.database.queries.diet_cycles_queries import (
@@ -154,6 +154,30 @@ elif page == "Sleep":
         ]
         df_sleep = pd.DataFrame(sleep_data, columns=column_names)
         st.dataframe(df_sleep)
+
+        # Query sleep stats
+        sleep_stats = query_get_sleep_stats(start_date=start_date, end_date=end_date)
+        if sleep_stats:
+            avg_rem, avg_deep, avg_core, avg_awake, avg_total_sleep = sleep_stats
+
+            # Prepare data for the chart
+            sleep_stats_df = pd.DataFrame({
+                "Sleep Cycle": ["REM Sleep", "Deep Sleep", "Core Sleep", "Awake Time", "Total Sleep"],
+                "Duration (hrs)": [avg_rem, avg_deep, avg_core, avg_awake, avg_total_sleep]
+            })
+
+            # Create a bar chart for sleep stats
+            sleep_stats_chart = alt.Chart(sleep_stats_df).mark_bar().encode(
+                x=alt.X("Sleep Cycle:N", title="Sleep Cycle"),
+                y=alt.Y("Duration (hrs):Q", title="Duration (hrs)"),
+                color=alt.Color("Sleep Cycle:N", title="Sleep Cycle")
+            ).properties(
+                title="Sleep Stats (Filtered Date Range)"
+            )
+
+            st.altair_chart(sleep_stats_chart, use_container_width=True)
+        else:
+            st.info("No sleep stats available for the selected date range.")
     else:
         st.info("No sleep data found for the selected date range.")
 

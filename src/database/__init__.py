@@ -1,1 +1,2 @@
-# This file makes the `src` directory a Python package.
+# This file marks the directory as a Python package.
+# Leave it empty or add package-level imports if needed.
