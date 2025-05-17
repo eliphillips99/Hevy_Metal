@@ -79,10 +79,66 @@ elif page == "Nutrition":
     if nutrition_data:
         column_names = ["Date", "Protein (g)", "Calories", "Carbohydrates (g)", "Fat (g)"]
         df_nutrition = pd.DataFrame(nutrition_data, columns=column_names)
-        st.dataframe(df_nutrition)
-        st.line_chart(df_nutrition.set_index("Date")["Protein (g)"])
+
+        # Convert the Date column to datetime format
+        df_nutrition['Date'] = pd.to_datetime(df_nutrition['Date'])
+
+        # Hardcoded protein target values
+        protein_target_min = 145  # Minimum protein target
+        protein_target_max = 180  # Maximum protein target
+
+        # Create a DataFrame for the target lines
+        target_lines_df = pd.DataFrame({
+            'Protein Target': [protein_target_min, protein_target_max],
+            'Target Type': ['Min', 'Max']
+        })
+
+        # Add horizontal dotted lines for the protein targets
+        target_lines = alt.Chart(target_lines_df).mark_rule(
+            strokeDash=[5, 5],  # Dotted line
+            color='green',
+            size=2  # Thicker line
+        ).encode(
+            y=alt.Y('Protein Target:Q', title='Protein Target'),
+            tooltip=['Target Type:N', 'Protein Target:Q']  # Add tooltips for the target lines
+        )
+
+        # Ensure the start_date and end_date are datetime objects
+        start_date = pd.to_datetime(start_date)
+        end_date = pd.to_datetime(end_date)
+
+        # Filter data based on the selected date range
+        filtered_data = df_nutrition[(df_nutrition['Date'] >= start_date) & 
+                                     (df_nutrition['Date'] <= end_date)]
+
+        # this line is necessary to keep filtering operational for the chart, will need fixed later
+        st.sidebar.write('Filtered Data:', filtered_data)
+
+        # Ensure the filtered data is not empty
+        if not filtered_data.empty:
+            # Create the base protein chart
+            protein_chart = alt.Chart(filtered_data).mark_bar().encode(
+                x=alt.X('Date:T', title='Date', type='temporal'),  # Explicitly set type to temporal
+                y=alt.Y(
+                    'Protein (g):Q',
+                    title='Protein (g)',
+                    scale=alt.Scale(domain=[0, max(filtered_data['Protein (g)'].max(), protein_target_max) + 20])  # Add padding to the max value
+                ),
+            ).properties(
+                title='Protein Intake Over Time'
+            )
+
+            # Combine the charts
+            combined_chart = protein_chart + target_lines
+            st.altair_chart(combined_chart, use_container_width=True)
+        else:
+            # Show only the target lines if no data is available
+            st.info("No nutrition data found for the selected date range.")
+            st.altair_chart(target_lines.properties(title="Protein Intake Over Time"), use_container_width=True)
     else:
         st.info("No nutrition data found for the selected date range.")
+        # Always show the target lines even if no data is available
+        st.altair_chart(target_lines.properties(title="Protein Intake Over Time"), use_container_width=True)
 
 elif page == "Sleep":
     st.title("Sleep Analysis")
