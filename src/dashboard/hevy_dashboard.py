@@ -3,6 +3,7 @@ import pandas as pd
 from datetime import date
 import sys
 import os
+import altair as alt
 
 # Dynamically add the project root to sys.path
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -23,7 +24,7 @@ from src.database.queries.hevy_sql_queries import (
 )
 from src.database.queries.sleep_queries import query_get_sleep_data
 from src.database.queries.nutrition_queries import query_get_nutrition_data
-from src.database.queries.health_markers_queries import query_get_health_markers
+from src.database.queries.health_markers_queries import *
 from src.database.queries.diet_cycles_queries import (
     query_get_current_diet_cycle,
     query_get_all_diet_cycles,
@@ -31,6 +32,7 @@ from src.database.queries.diet_cycles_queries import (
     query_insert_diet_week
 )
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 from src.database.connection import engine
 
 # Create a database session
@@ -38,7 +40,7 @@ db = Session(bind=engine)
 
 def set_query_params(**params):
     """Helper function to set query parameters."""
-    st.query_params(**params)  # Updated to use st.query_params
+    st.experimental_set_query_params(**params)  # Use the correct Streamlit function
 
 '''def append_to_diet_weeks_csv(cycle_id, week_id, week_start_date, calorie_target, source):
     """Append a new diet week to the CSV file."""
@@ -100,20 +102,59 @@ elif page == "Sleep":
         st.info("No sleep data found for the selected date range.")
 
 elif page == "Health Markers":
-    st.title("Daily Health Markers")
+    
     start_date = st.sidebar.date_input("Start Date", value=date(2025, 1, 1))
     end_date = st.sidebar.date_input("End Date", value=date.today())
-    health_markers = query_get_health_markers(start_date=start_date, end_date=end_date)
+
+    st.title("Daily Health Markers")
+    # Use the new aggregated query
+    health_markers = query_get_aggregated_health_markers(start_date=start_date, end_date=end_date)
 
     if health_markers:
         column_names = [
-            "Date", "Heart Rate", "VO2 Max", "Body Weight (lbs)", "BMI",
-            "Respiratory Rate", "Blood Oxygen Saturation"
+            "Date", "Heart Rate Avg", "Heart Rate Min", "Heart Rate Max", "VO2 Max", "Body Weight (lbs)", "BMI",
+            "Respiratory Rate", "Blood Oxygen Saturation", "Time in Daylight (min)"
         ]
         df_health = pd.DataFrame(health_markers, columns=column_names)
         st.dataframe(df_health)
     else:
         st.info("No health marker data found for the selected date range.")
+
+    st.title("Body Weight Over Time")
+
+    body_weight = query_get_body_weight_over_time(start_date=start_date, end_date=end_date)
+    cycle_start_dates = query_get_all_diet_cycles(start_date=start_date, end_date=end_date)
+
+    if cycle_start_dates:
+        df_diet_cycles = pd.DataFrame(cycle_start_dates, columns=[
+        "Cycle ID", "Common Data ID", "Start Date", "End Date", "Cycle Type", 
+        "Gain Rate", "Loss Rate", "Source", "Notes", "Created At", "Updated At"])
+        start_dates = df_diet_cycles["Start Date"]
+        cycle_types = df_diet_cycles["Cycle Type"]
+
+    if body_weight:
+        column_names = ["Date", "Body Weight (lbs)"]
+        df_body_weight = pd.DataFrame(body_weight, columns=column_names)
+
+        
+        body_weight_chart = alt.Chart(df_body_weight).mark_line().encode(
+            x=alt.X('Date:T', title='Date'),
+            y=alt.Y('Body Weight (lbs):Q', title='Body Weight (lbs)', scale=alt.Scale(domain=[df_body_weight['Body Weight (lbs)'].min()-5, df_body_weight['Body Weight (lbs)'].max()+10])),
+        ).properties(
+            title='Body Weight Over Time'
+        )
+        cycle_chart = alt.Chart(df_diet_cycles).mark_bar(size=5).encode(
+            x=alt.X('Start Date:T', title='Diet Cycle Start Date'),
+            color=alt.Color('Cycle Type:N', title='Cycle Type', scale=alt.Scale(domain=['bulk', 'cut', 'maintenance'], range=['yellow', 'red', 'orange'])),
+            tooltip=['Start Date:T', 'End Date:T', 'Cycle Type:N', 'Gain Rate:Q', 'Loss Rate:Q']
+        )
+
+        combined_chart = body_weight_chart + cycle_chart
+        st.altair_chart(combined_chart, use_container_width=True)
+    else:
+        st.info("No body weight data found for the selected date range.")
+
+        
 
 elif page == "Diet Cycles":
     st.title("Diet Cycles")
@@ -121,7 +162,7 @@ elif page == "Diet Cycles":
     if diet_cycles:
         column_names = [
             "Cycle ID", "Common Data ID", "Start Date", "End Date", "Cycle Type",
-            "Gain Rate (lbs/week)", "Loss Rate (lbs/week)", "Notes", "Created At", "Updated At"
+            "Gain Rate (lbs/week)", "Loss Rate (lbs/week)", "Source", "Notes", "Created At", "Updated At"
         ]
         df_cycles = pd.DataFrame(diet_cycles, columns=column_names)
         st.dataframe(df_cycles)
@@ -158,7 +199,7 @@ elif page == "Data Input":
 
                 # Check if the common_data entry already exists
                 existing_common_data = db.execute(
-                    "SELECT common_data_id FROM common_data WHERE date = :date AND source = :source",
+                    text("SELECT common_data_id FROM common_data WHERE date = :date AND source = :source"),
                     {"date": week_start_date.strftime("%Y-%m-%d %H:%M:%S"), "source": source}
                 ).fetchone()
 

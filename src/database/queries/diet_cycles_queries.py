@@ -10,7 +10,7 @@ import os  # Import os for file path operations
 db = Session(bind=engine)
 
 DIET_CYCLES_CSV_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../data/diet_cycles.csv"))
-DIET_WEEKS_CSV_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../data/diet_weeks.csv"))
+DIET_WEEKS_CSV_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../data/diet_weeks.csv"))
 
 def query_insert_diet_cycle(start_date, cycle_type, end_date=None, notes=None):
     return db.execute(
@@ -59,16 +59,51 @@ def query_get_all_diet_cycles(start_date=None, end_date=None):
         query = query.where(and_(*conditions))
     return db.execute(query).fetchall()
 
-def query_insert_common_data(date, source=None):
-    """Insert a record into the common_data table and return the generated common_data_id."""
-    result = db.execute(
-        common_data.insert().values(
-            date=date,
-            source=source
+def query_insert_common_data(record_date, source=None):
+    """Insert a record into the common_data table or return the existing common_data_id."""
+
+    try:
+        # Debugging: Log the raw record_date
+        print(f"Debug: Raw record_date: {record_date}")
+
+        # Ensure the date is in the correct format
+        if isinstance(record_date, date) and not isinstance(record_date, datetime):
+            record_date = datetime.combine(record_date, datetime.min.time())  # Convert date to datetime
+        elif not isinstance(record_date, datetime):
+            raise ValueError(f"Invalid record_date: {record_date}. Must be a datetime or date object.")
+
+        # Debugging: Log the formatted record_date
+        print(f"Debug: Formatted record_date: {record_date}")
+
+        # Check if the record already exists
+        existing_record = db.execute(
+            select(common_data.c.common_data_id).where(
+                common_data.c.date == record_date,
+                common_data.c.source == source
+            )
+        ).fetchone()
+
+        if existing_record:
+            # Debugging: Log that the record already exists
+            print(f"Debug: Found existing common_data_id={existing_record.common_data_id}")
+            return existing_record.common_data_id
+
+        # Insert a new record if it doesn't exist
+        print(f"Debug: Inserting into common_data with date={record_date}, source={source}")
+        result = db.execute(
+            common_data.insert(),
+            {"date": record_date, "source": source}
         )
-    )
-    db.commit()
-    return result.inserted_primary_key[0]
+        db.commit()
+
+        # Debugging: Log the newly inserted record
+        print(f"Debug: Inserted new common_data_id={result.inserted_primary_key[0]}")
+        return result.inserted_primary_key[0]
+    except Exception as e:
+        # Debugging: Log any errors
+        print(f"Error in query_insert_common_data: {e}")
+        db.rollback()
+        raise
 
 def update_diet_weeks_csv():
     """Fetch all diet weeks and update the diet_weeks.csv file."""
@@ -111,7 +146,8 @@ def query_insert_diet_week(cycle_id, week_start_date, calorie_target, source=Non
     """Insert a new diet week into the diet_weeks table and update the CSV file."""
     try:
         # Generate a common_data_id
-        common_data_id = query_insert_common_data(date=week_start_date, source=source)
+        print(f"Debug: week_start_date before calling query_insert_common_data: {week_start_date}")
+        common_data_id = query_insert_common_data(record_date=week_start_date, source=source)
 
         # Insert into diet_weeks_table with timestamps
         current_time = datetime.utcnow()
@@ -140,4 +176,5 @@ def query_insert_diet_week(cycle_id, week_start_date, calorie_target, source=Non
 
 def query_get_diet_weeks(diet_cycle_id):
     query = select(diet_weeks_table).where(diet_weeks_table.c.diet_cycle_id == diet_cycle_id)
+    return db.execute(query).fetchall()
     return db.execute(query).fetchall()
