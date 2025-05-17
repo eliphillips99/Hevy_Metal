@@ -66,4 +66,27 @@ def query_get_aggregated_health_markers(start_date=None, end_date=None):
             conditions.append(common_data.c.date <= end_date)
         query = query.where(and_(*conditions))
 
+def query_get_body_weight_over_time(start_date=None, end_date=None):
+    """
+    Retrieves body weight data over time, optionally filtered by date range.
+    """
+    query = select(
+        common_data.c.date.label("Date"),
+        health_markers_table.c.body_weight_lbs.label("Body Weight (lbs)")
+    ).join(
+        common_data, health_markers_table.c.common_data_id == common_data.c.common_data_id
+    ).order_by(
+        common_data.c.date
+    ).where(
+        health_markers_table.c.body_weight_lbs.isnot(None)  # Ensure body weight is not null
+    )
+    if start_date or end_date:
+        conditions = []
+        if start_date:
+            conditions.append(common_data.c.date >= start_date)
+        if end_date:
+            conditions.append(common_data.c.date <= end_date)
+        query = query.where(and_(*conditions))
+
+
     return db.execute(query).fetchall()
