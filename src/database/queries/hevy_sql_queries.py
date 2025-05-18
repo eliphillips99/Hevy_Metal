@@ -6,6 +6,7 @@ from src.database.schema import metadata, exercises_table, workouts_table, worko
 from sqlalchemy import and_
 from sqlalchemy.orm import Session
 from src.database.connection import engine  # Assuming `engine` is defined in a connection module
+from src.database.database_utils import apply_date_filter
 
 # Initialize the database session
 db = Session(bind=engine)
@@ -31,14 +32,7 @@ def query_get_all_workouts(start_date=None, end_date=None):
         workouts_table.c.end_time
     ).order_by(workouts_table.c.start_time.desc())
 
-    if start_date or end_date:
-        conditions = []
-        if start_date:
-            conditions.append(workouts_table.c.start_time >= start_date)
-        if end_date:
-            conditions.append(workouts_table.c.start_time <= end_date)
-        query = query.where(and_(*conditions))
-
+    query = apply_date_filter(query, workouts_table, start_date, end_date, date_column='start_time')
     return db.execute(query).fetchall()
 
 def query_get_exercises_in_workout(workout_id):

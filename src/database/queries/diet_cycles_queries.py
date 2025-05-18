@@ -5,6 +5,7 @@ from src.database.schema import diet_cycles_table, diet_weeks_table, common_data
 from src.database.connection import engine  # Assuming `engine` is defined in a connection module
 import pandas as pd  # Import pandas for CSV operations
 import os  # Import os for file path operations
+from src.database.database_utils import apply_date_filter
 
 # Initialize the database session
 db = Session(bind=engine)
@@ -49,15 +50,15 @@ def query_get_current_diet_cycle(reference_date=None):
     return db.execute(query).fetchone()
 
 def query_get_all_diet_cycles(start_date=None, end_date=None):
+    """
+    Fetch all diet cycles within the specified date range.
+    :param start_date: The start date for filtering (inclusive).
+    :param end_date: The end date for filtering (inclusive).
+    :return: A list of diet cycles.
+    """
     query = select(diet_cycles_table).order_by(diet_cycles_table.c.start_date.desc())
-    if start_date or end_date:
-        conditions = []
-        if start_date:
-            conditions.append(diet_cycles_table.c.start_date >= start_date)
-        if end_date:
-            conditions.append(diet_cycles_table.c.start_date <= end_date)
-        query = query.where(and_(*conditions))
-    return db.execute(query).fetchall()
+    query = apply_date_filter(query, diet_cycles_table, start_date, end_date, date_column='start_date')
+    return db.execute(query).fetchall()  # Execute the query and fetch results as a list
 
 def query_insert_common_data(record_date, source=None):
     """Insert a record into the common_data table or return the existing common_data_id."""
