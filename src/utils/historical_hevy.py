@@ -38,7 +38,9 @@ def fetch_all_hevy_workouts():
             print(f"Error fetching data from Hevy API: {e}")
             break
 
-    return all_workouts
+    # Deduplicate workouts by ID
+    unique_workouts = {workout["id"]: workout for workout in all_workouts}.values()
+    return list(unique_workouts)
 
 def store_workouts_in_sqlite(workouts):
     """Stores Hevy workout data in the SQLite database using the updated schema."""
@@ -51,6 +53,14 @@ def store_workouts_in_sqlite(workouts):
     cursor = conn.cursor()
 
     for workout in workouts:
+        hevy_workout_id = workout.get("id")
+
+        # Check if the workout already exists in the database
+        cursor.execute("SELECT COUNT(*) FROM workouts WHERE hevy_workout_id = ?", (hevy_workout_id,))
+        if cursor.fetchone()[0] > 0:
+            print(f"Skipping duplicate workout {hevy_workout_id}.")
+            continue
+
         if not isinstance(workout, dict):
             print(f"Skipping invalid workout data: {workout}")
             continue
@@ -68,7 +78,6 @@ def store_workouts_in_sqlite(workouts):
             continue
 
         # Insert into workouts
-        hevy_workout_id = workout.get("id")
         workout_name = workout.get("title")
         workout_description = workout.get("description")
         start_time = datetime.fromisoformat(workout.get("start_time")) if workout.get("start_time") else None
@@ -93,6 +102,13 @@ def store_workouts_in_sqlite(workouts):
         # Insert exercises and workout_exercises
         for exercise_data in workout.get("exercises", []):
             hevy_exercise_template_id = exercise_data.get("exercise_template_id")
+
+            # Check if the exercise already exists in the database
+            cursor.execute("SELECT COUNT(*) FROM exercises WHERE hevy_exercise_template_id = ?", (hevy_exercise_template_id,))
+            if cursor.fetchone()[0] > 0:
+                #print(f"Skipping duplicate exercise {hevy_exercise_template_id}.")
+                continue
+
             exercise_name = exercise_data.get("title")
             exercise_index = exercise_data.get("index")
             exercise_notes = exercise_data.get("notes")
@@ -123,6 +139,27 @@ def store_workouts_in_sqlite(workouts):
 
             # Insert sets
             for set_data in exercise_data.get("sets", []):
+                set_key = (
+                    hevy_exercise_template_id,
+                    set_data.get("index"),
+                    set_data.get("type"),
+                    set_data.get("weight_kg"),
+                    set_data.get("reps"),
+                    set_data.get("duration_seconds"),
+                    set_data.get("rpe"),
+                    set_data.get("custom_metric"),
+                )
+
+                # Check if the set already exists in the database
+                cursor.execute("""
+                    SELECT COUNT(*) FROM sets
+                    WHERE exercise_id = (SELECT exercise_id FROM exercises WHERE hevy_exercise_template_id = ?)
+                    AND set_index = ? AND set_type = ? AND weight_kg = ? AND reps = ? AND duration_seconds = ? AND rpe = ? AND custom_metric = ?
+                """, set_key)
+                if cursor.fetchone()[0] > 0:
+                    print(f"Skipping duplicate set for exercise {hevy_exercise_template_id}.")
+                    continue
+
                 set_index = set_data.get("index")
                 set_type = set_data.get("type")
                 weight_kg = set_data.get("weight_kg")
@@ -131,6 +168,20 @@ def store_workouts_in_sqlite(workouts):
                 rpe = set_data.get("rpe")
                 custom_metric = set_data.get("custom_metric")
 
+                # Check if the set already exists
+                try:
+                    cursor.execute("""
+                        SELECT COUNT(*) FROM sets
+                        WHERE exercise_id = ? AND set_index = ? AND set_type = ? AND weight_kg = ? AND reps = ? AND duration_seconds = ? AND rpe = ? AND custom_metric = ?
+                    """, (exercise_id, set_index, set_type, weight_kg, reps, duration_seconds, rpe, custom_metric))
+                    if cursor.fetchone()[0] > 0:
+                        print(f"Skipping duplicate set for exercise {exercise_name}.")
+                        continue
+                except sqlite3.Error as e:
+                    print(f"Error checking for duplicate set: {e}")
+                    continue
+
+                # Insert the set if it does not exist
                 try:
                     cursor.execute("""
                         INSERT INTO sets (exercise_id, set_index, set_type, weight_kg, reps, duration_seconds, rpe, custom_metric)

@@ -256,7 +256,6 @@ def pull_nutrition_from_json(metric_data, metric_name, cursor, nutrition_data_gr
             ))
 
 def pull_markers_from_json(metric_data, metric_name, cursor, markers_data_grouped):
-    print(f"Processing metric: {metric_name}")
     for entry in metric_data:
         date = entry.get("date")
         source = entry.get("source", "Unknown")
@@ -330,12 +329,6 @@ def pull_markers_from_json(metric_data, metric_name, cursor, markers_data_groupe
 
         # Get or create the common_data_id
         common_data_id = get_or_create_common_data_id(cursor, timestamp, source)
-
-        # Debugging: Print the data point before adding it to the database
-        print(f"Preparing to insert/update health marker row:")
-        print(f"  Date: {timestamp}")
-        print(f"  Source: {source}")
-        print(f"  Values: {marker_values}")
 
         # Check if a row already exists for this common_data_id
         cursor.execute("""
@@ -420,13 +413,11 @@ def import_daily_data(data, conn):
     # Import metrics data
     for metric in data.get("metrics", []):
         metric_name = metric.get("name")
-        print(f"Found metric: {metric_name}")
 
         metric_units = metric.get("units")
         metric_data = metric.get("data", [])
         # Translate metric name using the mapping
         metric_name = METRIC_NAME_MAPPING.get(metric_name, metric_name)
-        print(f"Translated Metric Name: {metric_name}")
         #print(f"Processing metric: {metric_name} with units: {metric_units}")
         #print(f"Mapped Metric Name: {metric_name}, Original Name: {metric.get('name')}")
         insert_raw_data(cursor, metric_name, metric_units, metric_data)
@@ -435,7 +426,6 @@ def import_daily_data(data, conn):
             pull_sleep_from_json(metric_data, cursor)
 
         elif metric_name in nutrition_metrics:
-            print(f"Calling pull_nutrition_from_json for Metric: {metric_name}")
             pull_nutrition_from_json(metric_data, metric_name, cursor, nutrition_data_grouped)
 
         elif metric_name in markers_metrics:

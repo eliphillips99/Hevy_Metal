@@ -47,6 +47,7 @@ sets_table = Table('sets', metadata,
     Column('duration_seconds', Float),
     Column('rpe', Float),
     Column('custom_metric', String),
+    UniqueConstraint('exercise_id', 'set_index', 'set_type', 'weight_kg', 'reps', 'duration_seconds', 'rpe', 'custom_metric', name='uq_sets')
 )
 
 metrics = Table('metrics', metadata,
