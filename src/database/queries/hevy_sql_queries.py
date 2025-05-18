@@ -10,7 +10,7 @@ from src.database.connection import engine  # Assuming `engine` is defined in a 
 # Initialize the database session
 db = Session(bind=engine)
 
-def query_apply_date_filter(query, table, start_date=None, end_date=None, date_column='start_time'):  # Updated default to `start_time`
+def query_apply_date_filter(query, table, start_date=None, end_date=None, date_column='start_time'):
     """Applies a date range filter to a SQLAlchemy query on a specified date column."""
     conditions = []
     if start_date:
@@ -22,26 +22,23 @@ def query_apply_date_filter(query, table, start_date=None, end_date=None, date_c
         return query.where(and_(*conditions))
     return query
 
-print("Debug: Columns in workouts_table:", workouts_table.columns.keys())  # Confirm available columns
-
 def query_get_all_workouts(start_date=None, end_date=None):
     """Returns a query for all workouts, ordered by start time."""
     query = select(
         workouts_table.c.workout_id,
-        workouts_table.c.workout_name,  # Correct column name
+        workouts_table.c.workout_name,
         workouts_table.c.start_time,
         workouts_table.c.end_time
-    ).order_by(workouts_table.c.start_time.desc())  # Ensure `start_time` is used for ordering
+    ).order_by(workouts_table.c.start_time.desc())
 
     if start_date or end_date:
         conditions = []
         if start_date:
-            conditions.append(workouts_table.c.start_time >= start_date)  # Use `start_time` for filtering
+            conditions.append(workouts_table.c.start_time >= start_date)
         if end_date:
-            conditions.append(workouts_table.c.start_time <= end_date)  # Use `start_time` for filtering
+            conditions.append(workouts_table.c.start_time <= end_date)
         query = query.where(and_(*conditions))
 
-    print("Debug: Generated Query:", query)  # Log the generated query
     return db.execute(query).fetchall()
 
 def query_get_exercises_in_workout(workout_id):
@@ -373,4 +370,4 @@ __all__ = [
     "query_debug_broken_relationships",
     "query_debug_broken_workout_relationships",
     "query_debug_broken_set_relationships"
-]  # Removed unmatched closing bracket
+]

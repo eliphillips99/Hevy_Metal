@@ -112,84 +112,6 @@ if page == "Workouts":
 
     st.title("Muscle Group Volume")
 
-    # Debugging: Check for broken relationships in workout_exercises
-    debug_broken_workout_relationships_query = query_debug_broken_workout_relationships()
-    debug_broken_workout_relationships_data = db.execute(debug_broken_workout_relationships_query).fetchall()
-    debug_broken_workout_relationships_summary = {
-        "total_rows": len(debug_broken_workout_relationships_data),
-        "sample_row": dict(zip(debug_broken_workout_relationships_query.columns.keys(), debug_broken_workout_relationships_data[0])) if debug_broken_workout_relationships_data else None
-    }
-    st.write("Debug: Broken Relationships Between workout_exercises and workouts", debug_broken_workout_relationships_summary)
-
-    # Debugging: Check for broken relationships in sets
-    debug_broken_set_relationships_query = query_debug_broken_set_relationships()
-    debug_broken_set_relationships_data = db.execute(debug_broken_set_relationships_query).fetchall()
-    debug_broken_set_relationships_summary = {
-        "total_rows": len(debug_broken_set_relationships_data),
-        "sample_row": dict(zip(debug_broken_set_relationships_query.columns.keys(), debug_broken_set_relationships_data[0])) if debug_broken_set_relationships_data else None
-    }
-    st.write("Debug: Broken Relationships Between sets and exercises", debug_broken_set_relationships_summary)
-
-    # Debugging: Display summary of rows from the sets table
-    debug_all_sets_query = query_debug_all_sets()
-    debug_all_sets_data = db.execute(debug_all_sets_query).fetchall()
-    debug_all_sets_summary = {
-        "total_rows": len(debug_all_sets_data),
-        "sample_row": dict(zip(debug_all_sets_query.columns.keys(), debug_all_sets_data[0])) if debug_all_sets_data else None
-    }
-    st.write("Debug: Sets Table Summary", debug_all_sets_summary)
-
-    # Debugging: Display summary of rows from the exercises table
-    debug_all_exercises_query = query_debug_all_exercises()
-    debug_all_exercises_data = db.execute(debug_all_exercises_query).fetchall()
-    debug_all_exercises_summary = {
-        "total_rows": len(debug_all_exercises_data),
-        "sample_row": dict(zip(debug_all_exercises_query.columns.keys(), debug_all_exercises_data[0])) if debug_all_exercises_data else None
-    }
-    st.write("Debug: Exercises Table Summary", debug_all_exercises_summary)
-
-    # Debugging: Display summary of rows from the workout_exercises table
-    debug_all_workout_exercises_query = query_debug_all_workout_exercises()
-    debug_all_workout_exercises_data = db.execute(debug_all_workout_exercises_query).fetchall()
-    debug_all_workout_exercises_summary = {
-        "total_rows": len(debug_all_workout_exercises_data),
-        "sample_row": dict(zip(debug_all_workout_exercises_query.columns.keys(), debug_all_workout_exercises_data[0])) if debug_all_workout_exercises_data else None
-    }
-    st.write("Debug: Workout Exercises Table Summary", debug_all_workout_exercises_summary)
-
-    # Debugging: Display summary of rows from the workouts table
-    debug_all_workouts_query = query_debug_all_workouts()
-    debug_all_workouts_data = db.execute(debug_all_workouts_query).fetchall()
-    debug_all_workouts_summary = {
-        "total_rows": len(debug_all_workouts_data),
-        "sample_row": {
-            key: (value.isoformat() if isinstance(value, datetime.datetime) else value)
-            for key, value in zip(debug_all_workouts_query.columns.keys(), debug_all_workouts_data[0])
-        } if debug_all_workouts_data else None
-    }
-    st.write("Debug: Workouts Table Summary", debug_all_workouts_summary)
-
-    # Debugging: Display rows with broken relationships between sets and exercises
-    debug_broken_relationships_query = query_debug_broken_relationships()
-    debug_broken_relationships_data = db.execute(debug_broken_relationships_query).fetchall()
-    debug_broken_relationships_summary = {
-        "total_rows": len(debug_broken_relationships_data),
-        "sample_row": dict(zip(debug_broken_relationships_query.columns.keys(), debug_broken_relationships_data[0])) if debug_broken_relationships_data else None
-    }
-    st.write("Debug: Broken Relationships Between Sets and Exercises", debug_broken_relationships_summary)
-
-    # Debugging: Display all unique muscle groups
-    debug_unique_muscle_groups_query = query_debug_unique_muscle_groups()
-    debug_unique_muscle_groups_data = db.execute(debug_unique_muscle_groups_query).fetchall()
-    debug_unique_muscle_groups_df = pd.DataFrame(debug_unique_muscle_groups_data, columns=["Muscle Group"])
-    st.write("Debug: Unique Muscle Groups", debug_unique_muscle_groups_df)
-
-    # Debugging: Display joined sets, exercises, and workouts
-    debug_joined_query = query_debug_joined_sets_exercises_workouts()
-    debug_joined_data = db.execute(debug_joined_query).fetchall()
-    debug_joined_df = pd.DataFrame(debug_joined_data, columns=["Set ID", "Weight (kg)", "Reps", "Exercise ID", "Primary Muscles", "Secondary Muscles", "Workout ID", "Workout Start Time"])
-    st.write("Debug: Joined Sets, Exercises, and Workouts", debug_joined_df)
-
     # Fetch all unique muscle groups from the database
     all_muscle_groups_query = query_get_all_unique_muscle_groups()
     all_muscle_groups = [row[0] for row in db.execute(all_muscle_groups_query).fetchall() if row[0]]
@@ -209,33 +131,12 @@ if page == "Workouts":
         volume_data = []
 
         for muscle_name in selected_muscle_groups:
-            # Debugging: Log rows matching primary_muscles without date filtering
-            debug_no_date_query = query_debug_no_date_filter(muscle_name)
-            debug_no_date_data = db.execute(debug_no_date_query).fetchall()
-            debug_no_date_df = pd.DataFrame(debug_no_date_data, columns=["Set ID", "Weight (kg)", "Reps", "Primary Muscles", "Workout Start Time"])
-            st.write(f"Debug: Rows Matching Primary Muscle '{muscle_name}' Without Date Filtering", debug_no_date_df)
-
-            # Debugging: Log rows matching primary_muscles
-            debug_primary_query = query_debug_primary_muscle_matching(muscle_name)
-            debug_primary_data = db.execute(debug_primary_query).fetchall()
-            debug_primary_df = pd.DataFrame(debug_primary_data, columns=["Set ID", "Weight (kg)", "Reps", "Primary Muscles", "Workout Start Time"])
-            st.write(f"Debug: Rows Matching Primary Muscle '{muscle_name}'", debug_primary_df)
-
-            # Debugging: Log rows matching secondary_muscles
-            debug_secondary_query = query_debug_secondary_muscle_matching(muscle_name)  # Fixed typo
-            debug_secondary_data = db.execute(debug_secondary_query).fetchall()
-            debug_secondary_df = pd.DataFrame(debug_secondary_data, columns=["Set ID", "Weight (kg)", "Reps", "Secondary Muscles", "Workout Start Time"])
-            st.write(f"Debug: Rows Matching Secondary Muscle '{muscle_name}'", debug_secondary_df)
-
             # Fetch primary and secondary muscle volumes
             primary_volume_query = query_get_primary_muscle_volume(muscle_name, start_date, end_date)
             secondary_volume_query = query_get_secondary_muscle_volume(muscle_name, start_date, end_date)
 
             primary_volume = db.execute(primary_volume_query).scalar() or 0
             secondary_volume = db.execute(secondary_volume_query).scalar() or 0
-
-            # Debugging: Log the fetched volumes
-            st.write(f"Muscle: {muscle_name}, Primary Volume: {primary_volume}, Secondary Volume: {secondary_volume}")
 
             # Append data for the chart
             volume_data.append({"Muscle Group": muscle_name, "Muscle Role": "Primary Muscle", "Volume": primary_volume})
@@ -245,9 +146,6 @@ if page == "Workouts":
         if volume_data:
             # Create a DataFrame for the chart
             volume_df = pd.DataFrame(volume_data)
-
-            # Debugging: Display the DataFrame
-            st.write("Volume Data:", volume_df)
 
             # Create bar chart
             volume_chart = alt.Chart(volume_df).mark_bar().encode(
