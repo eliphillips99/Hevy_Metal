@@ -13,23 +13,6 @@ db = Session(bind=engine)
 DIET_CYCLES_CSV_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../data/diet_cycles.csv"))
 DIET_WEEKS_CSV_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../data/diet_weeks.csv"))
 
-def query_insert_diet_cycle(start_date, cycle_type, end_date=None, notes=None):
-    return db.execute(
-        diet_cycles_table.insert().values(
-            start_date=start_date,
-            end_date=end_date,
-            cycle_type=cycle_type,
-            notes=notes
-        )
-    )
-
-def query_update_diet_cycle_end_date(cycle_id, end_date):
-    return db.execute(
-        diet_cycles_table.update().where(
-            diet_cycles_table.c.cycle_id == cycle_id
-        ).values(end_date=end_date)
-    )
-
 def query_get_current_diet_cycle(reference_date=None):
     """
     Fetch the most recent ongoing diet cycle.

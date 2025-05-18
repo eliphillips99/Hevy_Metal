@@ -19,12 +19,14 @@ from src.database.queries.diet_cycles_queries import (
 from sqlalchemy.orm import Session
 from src.database.connection import engine
 import matplotlib.pyplot as plt
+from src.database.database_utils import apply_date_filter
 
 # Initialize the database session
 db = Session(bind=engine)
 
 def display_all_workouts(start_date=None, end_date=None):
-    workouts = query_get_all_workouts(start_date, end_date)
+    workouts_query = query_get_all_workouts(start_date, end_date)
+    workouts = db.execute(workouts_query).fetchall()
     for workout in workouts:
         print(workout)
 
@@ -39,12 +41,14 @@ def display_sets_for_exercise(workout_id, exercise_name):
         print(set_data)
 
 def display_unique_exercise_names(start_date=None, end_date=None):
-    exercises = query_get_all_unique_exercise_names(start_date, end_date)
+    exercises_query = query_get_all_unique_exercise_names(start_date, end_date)
+    exercises = db.execute(exercises_query).fetchall()
     for exercise in exercises:
         print(exercise.exercise_name)
 
 def display_exercise_counts(start_date=None, end_date=None):
-    counts = query_get_exercise_counts(start_date, end_date)
+    counts_query = query_get_exercise_counts(start_date, end_date)
+    counts = db.execute(counts_query).fetchall()
     for count in counts:
         print(f"{count.exercise_name}: {count.occurrence_count}")
 
@@ -68,7 +72,8 @@ def display_current_diet_cycle():
     print(current_cycle)
 
 def display_all_diet_cycles(start_date=None, end_date=None):
-    cycles = query_get_all_diet_cycles(start_date, end_date)
+    cycles_query = query_get_all_diet_cycles(start_date, end_date)
+    cycles = db.execute(cycles_query).fetchall()
     for cycle in cycles:
         print(cycle)
 

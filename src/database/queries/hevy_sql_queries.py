@@ -61,30 +61,25 @@ def query_get_sets_for_exercise_in_workout(workout_id, exercise_name):
 def query_get_all_unique_exercise_names(start_date=None, end_date=None):
     """Returns a query for all unique exercise names."""
     query = select(exercises_table.c.exercise_name).distinct()
-    
     return query_apply_date_filter(query, workout_exercises_table, start_date, end_date)
 
 def query_get_exercise_counts(start_date=None, end_date=None):
     """Returns a query for counting the occurrences of each exercise."""
-    query = select(exercises_table.c.exercise_name, func.count(workout_exercises_table.c.exercise_id).label('occurrence_count')).\
-        join(workout_exercises_table, exercises_table.c.exercise_id == workout_exercises_table.c.exercise_id).\
-        join(workouts_table, workout_exercises_table.c.workout_id == workouts_table.c.workout_id).\
-        group_by(exercises_table.c.exercise_name).\
-        order_by(func.count(workout_exercises_table.c.exercise_id).desc())
-    
-    return query_apply_date_filter(query, workouts_table, start_date, end_date)
-# More query functions using SQLAlchemy Core
-
-def query_insert_diet_cycle(start_date, cycle_type, end_date=None, notes=None):
-    return diet_cycles_table.insert().values(
-        start_date=start_date,
-        end_date=end_date,
-        cycle_type=cycle_type,
-        notes=notes
+    query = select(
+        exercises_table.c.exercise_name,
+        func.count(workout_exercises_table.c.exercise_id).label('occurrence_count')
+    ).join(
+        workout_exercises_table, exercises_table.c.exercise_id == workout_exercises_table.c.exercise_id
+    ).join(
+        workouts_table, workout_exercises_table.c.workout_id == workouts_table.c.workout_id
+    ).group_by(
+        exercises_table.c.exercise_name
+    ).order_by(
+        func.count(workout_exercises_table.c.exercise_id).desc()
     )
+    return query_apply_date_filter(query, workouts_table, start_date, end_date)
 
-def query_update_diet_cycle_end_date(cycle_id, end_date):
-    return diet_cycles_table.update().where(diet_cycles_table.c.cycle_id == cycle_id).values(end_date=end_date)
+# More query functions using SQLAlchemy Core
 
 def query_get_current_diet_cycle(on_date=None):
     from sqlalchemy import or_
@@ -382,8 +377,6 @@ __all__ = [
     "query_get_sets_for_exercise_in_workout",
     "query_get_all_unique_exercise_names",
     "query_get_exercise_counts",
-    "query_insert_diet_cycle",
-    "query_update_diet_cycle_end_date",
     "query_get_current_diet_cycle",
     "query_get_all_diet_cycles",
     "query_apply_date_filter",
