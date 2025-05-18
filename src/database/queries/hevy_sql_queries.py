@@ -118,6 +118,230 @@ def query_get_all_diet_cycles(start_date=None, end_date=None):
         query = query.where(and_(*conditions))
     return query
 
+def query_get_primary_muscle_volume(muscle_name, start_date=None, end_date=None):
+    """Returns the total volume for exercises where the muscle is the primary muscle."""
+    query = select(
+        func.sum((func.coalesce(sets_table.c.weight_kg, 0) * 2.20462) * func.coalesce(sets_table.c.reps, 0)).label('volume')  # Handle NULL values
+    ).\
+        join(exercises_table, sets_table.c.exercise_id == exercises_table.c.exercise_id).\
+        join(workout_exercises_table, workout_exercises_table.c.exercise_id == exercises_table.c.exercise_id).\
+        join(workouts_table, workout_exercises_table.c.workout_id == workouts_table.c.hevy_workout_id).\
+        where(func.lower(func.trim(func.replace(exercises_table.c.primary_muscles, ',', ' '))).like(f"%{muscle_name.lower()}%"))  # Split and match
+
+    query = query_apply_date_filter(query, workouts_table, start_date, end_date, date_column='start_time')
+    return query
+
+def query_get_secondary_muscle_volume(muscle_name, start_date=None, end_date=None):
+    """Returns the total volume for exercises where the muscle is part of the secondary muscle group."""
+    query = select(
+        func.sum((func.coalesce(sets_table.c.weight_kg, 0) * 2.20462) * func.coalesce(sets_table.c.reps, 0)).label('volume')  # Handle NULL values
+    ).\
+        join(exercises_table, sets_table.c.exercise_id == exercises_table.c.exercise_id).\
+        join(workout_exercises_table, workout_exercises_table.c.exercise_id == exercises_table.c.exercise_id).\
+        join(workouts_table, workout_exercises_table.c.workout_id == workouts_table.c.hevy_workout_id).\
+        where(func.lower(func.trim(func.replace(exercises_table.c.secondary_muscles, ',', ' '))).like(f"%{muscle_name.lower()}%"))  # Split and match
+
+    query = query_apply_date_filter(query, workouts_table, start_date, end_date, date_column='start_time')
+    return query
+
+def query_get_all_unique_muscle_groups():
+    """Returns a query for all unique primary and secondary muscle groups."""
+    query = select(
+        func.distinct(exercises_table.c.primary_muscles).label("muscle_group")
+    ).union(
+        select(func.distinct(exercises_table.c.secondary_muscles).label("muscle_group"))
+    )
+    return query
+
+def query_debug_sets_data():
+    """Debug query to fetch all sets data with related exercise and workout details."""
+    query = select(
+        sets_table.c.set_id,
+        sets_table.c.exercise_id,
+        sets_table.c.weight_kg,
+        sets_table.c.reps
+    ).\
+        join(exercises_table, sets_table.c.exercise_id == exercises_table.c.exercise_id, isouter=True).\
+        join(workout_exercises_table, workout_exercises_table.c.exercise_id == exercises_table.c.exercise_id, isouter=True).\
+        join(workouts_table, workout_exercises_table.c.workout_id == workouts_table.c.workout_id, isouter=True)
+    return query
+
+def query_debug_raw_sets_data():
+    """Debug query to fetch all rows from the sets table."""
+    query = select(
+        sets_table.c.set_id,
+        sets_table.c.exercise_id,
+        sets_table.c.set_index,
+        sets_table.c.weight_kg,
+        sets_table.c.reps,
+        sets_table.c.set_type
+    )
+    return query
+
+def query_debug_exercises_data():
+    """Debug query to fetch all exercises data."""
+    query = select(
+        exercises_table.c.exercise_id,
+        exercises_table.c.exercise_name,
+        exercises_table.c.primary_muscles,
+        exercises_table.c.secondary_muscles
+    )
+    return query
+
+def query_debug_workout_exercises_data():
+    """Debug query to fetch all workout_exercises data."""
+    query = select(
+        workout_exercises_table.c.workout_id,
+        workout_exercises_table.c.exercise_id,
+        workout_exercises_table.c.exercise_index
+    )
+    return query
+
+def query_debug_workouts_data():
+    """Debug query to fetch all workouts data."""
+    query = select(
+        workouts_table.c.workout_id,
+        workouts_table.c.workout_name,
+        workouts_table.c.start_time,
+        workouts_table.c.end_time
+    )
+    return query
+
+def query_debug_unique_muscle_groups():
+    """Debug query to fetch all unique primary and secondary muscle groups."""
+    query = select(
+        func.distinct(func.trim(func.lower(exercises_table.c.primary_muscles))).label("primary_muscle_group")
+    ).union(
+        select(func.distinct(func.trim(func.lower(exercises_table.c.secondary_muscles))).label("secondary_muscle_group"))
+    )
+    return query
+
+def query_debug_primary_muscle_matching(muscle_name):
+    """Debug query to fetch rows where the muscle matches primary_muscles."""
+    query = select(
+        sets_table.c.set_id,
+        sets_table.c.weight_kg,
+        sets_table.c.reps,
+        exercises_table.c.primary_muscles,
+        workouts_table.c.start_time
+    ).\
+        join(exercises_table, sets_table.c.exercise_id == exercises_table.c.exercise_id).\
+        join(workout_exercises_table, workout_exercises_table.c.exercise_id == exercises_table.c.exercise_id).\
+        join(workouts_table, workout_exercises_table.c.workout_id == workouts_table.c.workout_id).\
+        where(func.lower(func.trim(func.replace(exercises_table.c.primary_muscles, ',', ' '))).like(f"%{muscle_name.lower()}%"))
+    return query
+
+def query_debug_secondary_muscle_matching(muscle_name):
+    """Debug query to fetch rows where the muscle matches secondary_muscles."""
+    query = select(
+        sets_table.c.set_id,
+        sets_table.c.weight_kg,
+        sets_table.c.reps,
+        exercises_table.c.secondary_muscles,
+        workouts_table.c.start_time
+    ).\
+        join(exercises_table, sets_table.c.exercise_id == exercises_table.c.exercise_id).\
+        join(workout_exercises_table, workout_exercises_table.c.exercise_id == exercises_table.c.exercise_id).\
+        join(workouts_table, workout_exercises_table.c.workout_id == workouts_table.c.workout_id).\
+        where(func.lower(func.trim(func.replace(exercises_table.c.secondary_muscles, ',', ' '))).like(f"%{muscle_name.lower()}%"))
+    return query
+
+def query_debug_joined_sets_exercises_workouts():
+    """Debug query to fetch all rows from sets, exercises, and workouts with their relationships."""
+    query = select(
+        sets_table.c.set_id,
+        sets_table.c.weight_kg,
+        sets_table.c.reps,
+        exercises_table.c.exercise_id,
+        exercises_table.c.primary_muscles,
+        exercises_table.c.secondary_muscles,
+        workouts_table.c.hevy_workout_id.label("workout_id"),  # Use hevy_workout_id as the correct key
+        workouts_table.c.start_time
+    ).\
+        join(exercises_table, sets_table.c.exercise_id == exercises_table.c.exercise_id, isouter=True).\
+        join(workout_exercises_table, workout_exercises_table.c.exercise_id == exercises_table.c.exercise_id, isouter=True).\
+        join(workouts_table, workout_exercises_table.c.workout_id == workouts_table.c.hevy_workout_id, isouter=True)  # Correct join
+    return query
+
+def query_debug_no_date_filter(muscle_name):
+    """Debug query to fetch rows matching primary_muscles without date filtering."""
+    query = select(
+        sets_table.c.set_id,
+        sets_table.c.weight_kg,
+        sets_table.c.reps,
+        exercises_table.c.primary_muscles,
+        workouts_table.c.start_time
+    ).\
+        join(exercises_table, sets_table.c.exercise_id == exercises_table.c.exercise_id).\
+        join(workout_exercises_table, workout_exercises_table.c.exercise_id == exercises_table.c.exercise_id).\
+        join(workouts_table, workout_exercises_table.c.workout_id == workouts_table.c.workout_id).\
+        where(func.lower(func.trim(func.replace(exercises_table.c.primary_muscles, ',', ' '))).like(f"%{muscle_name.lower()}%"))
+    return query
+
+def query_debug_all_sets():
+    """Debug query to fetch all rows from the sets table."""
+    query = select(
+        sets_table.c.set_id,
+        sets_table.c.exercise_id,
+        sets_table.c.weight_kg,
+        sets_table.c.reps,
+        sets_table.c.set_type
+    )
+    return query
+
+def query_debug_all_exercises():
+    """Debug query to fetch all rows from the exercises table."""
+    query = select(
+        exercises_table.c.exercise_id,
+        exercises_table.c.exercise_name,
+        exercises_table.c.primary_muscles,
+        exercises_table.c.secondary_muscles
+    )
+    return query
+
+def query_debug_all_workout_exercises():
+    """Debug query to fetch all rows from the workout_exercises table."""
+    query = select(
+        workout_exercises_table.c.workout_id,
+        workout_exercises_table.c.exercise_id,
+        workout_exercises_table.c.exercise_index
+    )
+    return query
+
+def query_debug_all_workouts():
+    """Debug query to fetch all rows from the workouts table."""
+    query = select(
+        workouts_table.c.workout_id,
+        workouts_table.c.workout_name,
+        workouts_table.c.start_time,
+        workouts_table.c.end_time
+    )
+    return query
+
+def query_debug_broken_relationships():
+    """Debug query to find rows with broken relationships between sets and exercises."""
+    query = select(
+        sets_table.c.set_id,
+        sets_table.c.exercise_id
+    ).where(~sets_table.c.exercise_id.in_(select(exercises_table.c.exercise_id)))
+    return query
+
+def query_debug_broken_workout_relationships():
+    """Debug query to find rows in workout_exercises without matching hevy_workout_id in workouts."""
+    query = select(
+        workout_exercises_table.c.workout_id,
+        workout_exercises_table.c.exercise_id
+    ).where(~workout_exercises_table.c.workout_id.in_(select(workouts_table.c.hevy_workout_id)))  # Use hevy_workout_id
+    return query
+
+def query_debug_broken_set_relationships():
+    """Debug query to find rows in sets without matching exercise_id in exercises."""
+    query = select(
+        sets_table.c.set_id,
+        sets_table.c.exercise_id
+    ).where(~sets_table.c.exercise_id.in_(select(exercises_table.c.exercise_id)))
+    return query
+
 __all__ = [
     "query_get_all_workouts",
     "query_get_exercises_in_workout",
@@ -129,5 +353,24 @@ __all__ = [
     "query_get_current_diet_cycle",
     "query_get_all_diet_cycles",
     "query_apply_date_filter",
-    # Add other functions here as needed
-]
+    "query_get_primary_muscle_volume",
+    "query_get_secondary_muscle_volume",
+    "query_get_all_unique_muscle_groups",
+    "query_debug_sets_data",
+    "query_debug_exercises_data",
+    "query_debug_workout_exercises_data",
+    "query_debug_workouts_data",
+    "query_debug_raw_sets_data",  # Ensure this is included
+    "query_debug_unique_muscle_groups",  # Ensure this is included
+    "query_debug_primary_muscle_matching",
+    "query_debug_secondary_muscle_matching",
+    "query_debug_joined_sets_exercises_workouts",
+    "query_debug_no_date_filter",
+    "query_debug_all_sets",
+    "query_debug_all_exercises",
+    "query_debug_all_workout_exercises",
+    "query_debug_all_workouts",
+    "query_debug_broken_relationships",
+    "query_debug_broken_workout_relationships",
+    "query_debug_broken_set_relationships"
+]  # Removed unmatched closing bracket

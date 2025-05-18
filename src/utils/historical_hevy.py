@@ -42,6 +42,28 @@ def fetch_all_hevy_workouts():
     unique_workouts = {workout["id"]: workout for workout in all_workouts}.values()
     return list(unique_workouts)
 
+def fetch_exercise_details(exercise_template_id):
+    """Fetches detailed information about an exercise, including muscle groups, equipment, is_custom, and type."""
+    url = f"{BASE_URL}/exercise_templates/{exercise_template_id}"
+    headers = {"api-key": HEVY_API_KEY}
+
+    try:
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()
+        data = response.json()
+
+        # Extract primary and secondary muscle groups
+        primary_muscles = data.get("primary_muscle_group", "")  # Single string for primary muscle
+        secondary_muscles = ", ".join(data.get("secondary_muscle_groups", []))  # List of secondary muscles
+        equipment = data.get("equipment", "")  # Extract equipment
+        is_custom = 1 if data.get("is_custom", False) else 0  # Convert boolean to integer (1 for True, 0 for False)
+        exercise_type = data.get("type", "")  # Extract type of exercise
+
+        return primary_muscles, secondary_muscles, equipment, is_custom, exercise_type
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching exercise details for {exercise_template_id}: {e}")
+        return None, None, None, None, None
+
 def store_workouts_in_sqlite(workouts):
     """Stores Hevy workout data in the SQLite database using the updated schema."""
     
@@ -110,17 +132,15 @@ def store_workouts_in_sqlite(workouts):
                 continue
 
             exercise_name = exercise_data.get("title")
-            exercise_index = exercise_data.get("index")
-            exercise_notes = exercise_data.get("notes")
-            superset_id = exercise_data.get("superset_id")
+            primary_muscles, secondary_muscles, equipment, is_custom, exercise_type = fetch_exercise_details(hevy_exercise_template_id)
 
             # Insert into exercises
             exercise_id = None
             try:
                 cursor.execute("""
-                    INSERT OR IGNORE INTO exercises (hevy_exercise_template_id, exercise_name)
-                    VALUES (?, ?)
-                """, (hevy_exercise_template_id, exercise_name))
+                    INSERT OR IGNORE INTO exercises (hevy_exercise_template_id, exercise_name, primary_muscles, secondary_muscles, equipment, is_custom, type)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                """, (hevy_exercise_template_id, exercise_name, primary_muscles, secondary_muscles, equipment, is_custom, exercise_type))
                 cursor.execute("SELECT exercise_id FROM exercises WHERE hevy_exercise_template_id = ?", (hevy_exercise_template_id,))
                 exercise_id = cursor.fetchone()[0]
             except sqlite3.IntegrityError:
@@ -132,7 +152,7 @@ def store_workouts_in_sqlite(workouts):
                 cursor.execute("""
                     INSERT INTO workout_exercises (workout_id, exercise_id, exercise_index, exercise_notes, superset_id)
                     VALUES (?, ?, ?, ?, ?)
-                """, (hevy_workout_id, exercise_id, exercise_index, exercise_notes, superset_id))
+                """, (hevy_workout_id, exercise_id, exercise_data.get("index"), exercise_data.get("notes"), exercise_data.get("superset_id")))
             except sqlite3.IntegrityError:
                 print(f"Error inserting workout_exercise for workout {hevy_workout_id}.")
                 continue

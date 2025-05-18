@@ -26,7 +26,12 @@ workouts_table = Table('workouts', metadata,
 exercises_table = Table('exercises', metadata,
     Column('exercise_id', Integer, primary_key=True),
     Column('hevy_exercise_template_id', String, unique=True, nullable=False),
-    Column('exercise_name', String, nullable=False)
+    Column('exercise_name', String, nullable=False),
+    Column('primary_muscles', String),  # Existing column for primary muscles
+    Column('secondary_muscles', String),  # Existing column for secondary muscles
+    Column('equipment', String),  # Existing column for equipment
+    Column('is_custom', Integer),  # New column for whether the exercise is custom (0 or 1)
+    Column('type', String)  # New column for the type of exercise
 )
 
 workout_exercises_table = Table('workout_exercises', metadata,

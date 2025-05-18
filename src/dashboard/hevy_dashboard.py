@@ -4,6 +4,7 @@ from datetime import date, timedelta
 import sys
 import os
 import altair as alt
+import datetime  # Add this import for handling datetime objects
 
 # Dynamically add the project root to sys.path
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -15,13 +16,7 @@ DIET_CYCLES_CSV_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), "
 DIET_WEEKS_CSV_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../data/diet_weeks.csv"))
 
 
-from src.database.queries.hevy_sql_queries import (
-    query_get_all_workouts,
-    query_get_exercises_in_workout,
-    query_get_sets_for_exercise_in_workout,
-    query_get_all_unique_exercise_names,
-    query_get_exercise_counts
-)
+from src.database.queries.hevy_sql_queries import *
 from src.database.queries.sleep_queries import *
 from src.database.queries.nutrition_queries import query_get_nutrition_data
 from src.database.queries.health_markers_queries import *
@@ -34,6 +29,30 @@ from src.database.queries.diet_cycles_queries import (
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from src.database.connection import engine
+
+from src.database.queries.hevy_sql_queries import (
+    query_get_all_workouts,
+    query_get_primary_muscle_volume,
+    query_get_secondary_muscle_volume,
+    query_get_all_unique_muscle_groups,  # New query to fetch all unique muscle groups
+    query_debug_sets_data,  # Ensure this is included
+    query_debug_exercises_data,
+    query_debug_workout_exercises_data,
+    query_debug_workouts_data,
+    query_debug_unique_muscle_groups,  # Ensure this is included
+    query_debug_raw_sets_data,  # Ensure this is included
+    query_debug_primary_muscle_matching,  # Ensure this is included
+    query_debug_secondary_muscle_matching,  # Ensure this is included
+    query_debug_joined_sets_exercises_workouts,  # Ensure this is included
+    query_debug_no_date_filter,  # Ensure this is included
+    query_debug_all_sets,  # Ensure this is included
+    query_debug_all_exercises,  # Ensure this is included
+    query_debug_all_workout_exercises,  # Ensure this is included
+    query_debug_all_workouts,  # Ensure this is included
+    query_debug_broken_relationships,  # Ensure this is included
+    query_debug_broken_workout_relationships,  # Ensure this is included
+    query_debug_broken_set_relationships  # Ensure this is included
+)
 
 # Create a database session
 db = Session(bind=engine)
@@ -80,6 +99,8 @@ st.sidebar.title("Custom Date Range")
 start_date = st.sidebar.date_input("Start Date", value=start_date)
 end_date = st.sidebar.date_input("End Date", value=end_date)
 
+import json  # Import JSON module for formatting debug outputs
+
 if page == "Workouts":
     st.title("Workout Counts")
     workouts = query_get_all_workouts(start_date=start_date, end_date=end_date)
@@ -88,6 +109,161 @@ if page == "Workouts":
         st.dataframe(df_workouts)
     else:
         st.info("No workouts found for the selected date range.")
+
+    st.title("Muscle Group Volume")
+
+    # Debugging: Check for broken relationships in workout_exercises
+    debug_broken_workout_relationships_query = query_debug_broken_workout_relationships()
+    debug_broken_workout_relationships_data = db.execute(debug_broken_workout_relationships_query).fetchall()
+    debug_broken_workout_relationships_summary = {
+        "total_rows": len(debug_broken_workout_relationships_data),
+        "sample_row": dict(zip(debug_broken_workout_relationships_query.columns.keys(), debug_broken_workout_relationships_data[0])) if debug_broken_workout_relationships_data else None
+    }
+    st.write("Debug: Broken Relationships Between workout_exercises and workouts", debug_broken_workout_relationships_summary)
+
+    # Debugging: Check for broken relationships in sets
+    debug_broken_set_relationships_query = query_debug_broken_set_relationships()
+    debug_broken_set_relationships_data = db.execute(debug_broken_set_relationships_query).fetchall()
+    debug_broken_set_relationships_summary = {
+        "total_rows": len(debug_broken_set_relationships_data),
+        "sample_row": dict(zip(debug_broken_set_relationships_query.columns.keys(), debug_broken_set_relationships_data[0])) if debug_broken_set_relationships_data else None
+    }
+    st.write("Debug: Broken Relationships Between sets and exercises", debug_broken_set_relationships_summary)
+
+    # Debugging: Display summary of rows from the sets table
+    debug_all_sets_query = query_debug_all_sets()
+    debug_all_sets_data = db.execute(debug_all_sets_query).fetchall()
+    debug_all_sets_summary = {
+        "total_rows": len(debug_all_sets_data),
+        "sample_row": dict(zip(debug_all_sets_query.columns.keys(), debug_all_sets_data[0])) if debug_all_sets_data else None
+    }
+    st.write("Debug: Sets Table Summary", debug_all_sets_summary)
+
+    # Debugging: Display summary of rows from the exercises table
+    debug_all_exercises_query = query_debug_all_exercises()
+    debug_all_exercises_data = db.execute(debug_all_exercises_query).fetchall()
+    debug_all_exercises_summary = {
+        "total_rows": len(debug_all_exercises_data),
+        "sample_row": dict(zip(debug_all_exercises_query.columns.keys(), debug_all_exercises_data[0])) if debug_all_exercises_data else None
+    }
+    st.write("Debug: Exercises Table Summary", debug_all_exercises_summary)
+
+    # Debugging: Display summary of rows from the workout_exercises table
+    debug_all_workout_exercises_query = query_debug_all_workout_exercises()
+    debug_all_workout_exercises_data = db.execute(debug_all_workout_exercises_query).fetchall()
+    debug_all_workout_exercises_summary = {
+        "total_rows": len(debug_all_workout_exercises_data),
+        "sample_row": dict(zip(debug_all_workout_exercises_query.columns.keys(), debug_all_workout_exercises_data[0])) if debug_all_workout_exercises_data else None
+    }
+    st.write("Debug: Workout Exercises Table Summary", debug_all_workout_exercises_summary)
+
+    # Debugging: Display summary of rows from the workouts table
+    debug_all_workouts_query = query_debug_all_workouts()
+    debug_all_workouts_data = db.execute(debug_all_workouts_query).fetchall()
+    debug_all_workouts_summary = {
+        "total_rows": len(debug_all_workouts_data),
+        "sample_row": {
+            key: (value.isoformat() if isinstance(value, datetime.datetime) else value)
+            for key, value in zip(debug_all_workouts_query.columns.keys(), debug_all_workouts_data[0])
+        } if debug_all_workouts_data else None
+    }
+    st.write("Debug: Workouts Table Summary", debug_all_workouts_summary)
+
+    # Debugging: Display rows with broken relationships between sets and exercises
+    debug_broken_relationships_query = query_debug_broken_relationships()
+    debug_broken_relationships_data = db.execute(debug_broken_relationships_query).fetchall()
+    debug_broken_relationships_summary = {
+        "total_rows": len(debug_broken_relationships_data),
+        "sample_row": dict(zip(debug_broken_relationships_query.columns.keys(), debug_broken_relationships_data[0])) if debug_broken_relationships_data else None
+    }
+    st.write("Debug: Broken Relationships Between Sets and Exercises", debug_broken_relationships_summary)
+
+    # Debugging: Display all unique muscle groups
+    debug_unique_muscle_groups_query = query_debug_unique_muscle_groups()
+    debug_unique_muscle_groups_data = db.execute(debug_unique_muscle_groups_query).fetchall()
+    debug_unique_muscle_groups_df = pd.DataFrame(debug_unique_muscle_groups_data, columns=["Muscle Group"])
+    st.write("Debug: Unique Muscle Groups", debug_unique_muscle_groups_df)
+
+    # Debugging: Display joined sets, exercises, and workouts
+    debug_joined_query = query_debug_joined_sets_exercises_workouts()
+    debug_joined_data = db.execute(debug_joined_query).fetchall()
+    debug_joined_df = pd.DataFrame(debug_joined_data, columns=["Set ID", "Weight (kg)", "Reps", "Exercise ID", "Primary Muscles", "Secondary Muscles", "Workout ID", "Workout Start Time"])
+    st.write("Debug: Joined Sets, Exercises, and Workouts", debug_joined_df)
+
+    # Fetch all unique muscle groups from the database
+    all_muscle_groups_query = query_get_all_unique_muscle_groups()
+    all_muscle_groups = [row[0] for row in db.execute(all_muscle_groups_query).fetchall() if row[0]]
+
+    # Set default muscle groups
+    default_muscle_groups = ["chest", "back", "quads", "biceps"]
+
+    # Multi-select widget for muscle groups
+    selected_muscle_groups = st.multiselect(
+        "Select Muscle Groups",
+        options=all_muscle_groups,
+        default=[muscle for muscle in default_muscle_groups if muscle in all_muscle_groups]
+    )
+
+    if selected_muscle_groups:
+        # Initialize data for the bar chart
+        volume_data = []
+
+        for muscle_name in selected_muscle_groups:
+            # Debugging: Log rows matching primary_muscles without date filtering
+            debug_no_date_query = query_debug_no_date_filter(muscle_name)
+            debug_no_date_data = db.execute(debug_no_date_query).fetchall()
+            debug_no_date_df = pd.DataFrame(debug_no_date_data, columns=["Set ID", "Weight (kg)", "Reps", "Primary Muscles", "Workout Start Time"])
+            st.write(f"Debug: Rows Matching Primary Muscle '{muscle_name}' Without Date Filtering", debug_no_date_df)
+
+            # Debugging: Log rows matching primary_muscles
+            debug_primary_query = query_debug_primary_muscle_matching(muscle_name)
+            debug_primary_data = db.execute(debug_primary_query).fetchall()
+            debug_primary_df = pd.DataFrame(debug_primary_data, columns=["Set ID", "Weight (kg)", "Reps", "Primary Muscles", "Workout Start Time"])
+            st.write(f"Debug: Rows Matching Primary Muscle '{muscle_name}'", debug_primary_df)
+
+            # Debugging: Log rows matching secondary_muscles
+            debug_secondary_query = query_debug_secondary_muscle_matching(muscle_name)  # Fixed typo
+            debug_secondary_data = db.execute(debug_secondary_query).fetchall()
+            debug_secondary_df = pd.DataFrame(debug_secondary_data, columns=["Set ID", "Weight (kg)", "Reps", "Secondary Muscles", "Workout Start Time"])
+            st.write(f"Debug: Rows Matching Secondary Muscle '{muscle_name}'", debug_secondary_df)
+
+            # Fetch primary and secondary muscle volumes
+            primary_volume_query = query_get_primary_muscle_volume(muscle_name, start_date, end_date)
+            secondary_volume_query = query_get_secondary_muscle_volume(muscle_name, start_date, end_date)
+
+            primary_volume = db.execute(primary_volume_query).scalar() or 0
+            secondary_volume = db.execute(secondary_volume_query).scalar() or 0
+
+            # Debugging: Log the fetched volumes
+            st.write(f"Muscle: {muscle_name}, Primary Volume: {primary_volume}, Secondary Volume: {secondary_volume}")
+
+            # Append data for the chart
+            volume_data.append({"Muscle Group": muscle_name, "Muscle Role": "Primary Muscle", "Volume": primary_volume})
+            volume_data.append({"Muscle Group": muscle_name, "Muscle Role": "Secondary Muscle", "Volume": secondary_volume})
+
+        # Check if there is any data to display
+        if volume_data:
+            # Create a DataFrame for the chart
+            volume_df = pd.DataFrame(volume_data)
+
+            # Debugging: Display the DataFrame
+            st.write("Volume Data:", volume_df)
+
+            # Create bar chart
+            volume_chart = alt.Chart(volume_df).mark_bar().encode(
+                x=alt.X("Muscle Group:N", title="Muscle Group"),
+                y=alt.Y("Volume:Q", title="Volume (Weight x Reps)"),
+                color=alt.Color("Muscle Role:N", title="Muscle Role"),
+                tooltip=["Muscle Group", "Muscle Role", "Volume"]
+            ).properties(
+                title=f"Volume for Selected Muscle Groups ({start_date} to {end_date})"
+            )
+
+            st.altair_chart(volume_chart, use_container_width=True)
+        else:
+            st.info("No volume data available for the selected muscle groups and date range.")
+    else:
+        st.info("Select at least one muscle group to view its volume.")
 
 elif page == "Nutrition":
     st.title("Protein Per Day")
