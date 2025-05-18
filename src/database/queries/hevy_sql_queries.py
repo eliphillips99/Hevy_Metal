@@ -117,47 +117,45 @@ def query_get_all_diet_cycles(start_date=None, end_date=None):
 
 def query_get_primary_muscle_volume(muscle_name, start_date=None, end_date=None):
     """Returns the total volume for exercises where the muscle is the primary muscle."""
+    conditions = [
+        func.lower(func.trim(func.replace(exercises_table.c.primary_muscles, ',', ' '))).like(f"%{muscle_name.lower()}%")
+    ]
+    if start_date:
+        conditions.append(workouts_table.c.start_time >= start_date)
+    if end_date:
+        conditions.append(workouts_table.c.start_time <= end_date)
+
     query = select(
-        func.sum((func.coalesce(sets_table.c.weight_kg, 0) * func.coalesce(sets_table.c.reps, 0))).label('volume')  # Handle NULL values
+        func.sum((func.coalesce(sets_table.c.weight_kg, 0) * func.coalesce(sets_table.c.reps, 0))).label('volume')
     ).\
-        join(exercises_table, sets_table.c.exercise_id == exercises_table.c.exercise_id).\
-        join(workout_exercises_table, workout_exercises_table.c.exercise_id == exercises_table.c.exercise_id).\
-        join(workouts_table, workout_exercises_table.c.workout_id == workouts_table.c.hevy_workout_id).\
-        where(and_(
-            func.lower(func.trim(func.replace(exercises_table.c.primary_muscles, ',', ' '))).like(f"%{muscle_name.lower()}%"),
-            workouts_table.c.start_time >= start_date if start_date else True,  # Apply start_date filter
-            workouts_table.c.start_time <= end_date if end_date else True       # Apply end_date filter
-        ))
+        join(workout_exercises_table, sets_table.c.exercise_id == workout_exercises_table.c.exercise_id).\
+        join(exercises_table, workout_exercises_table.c.exercise_id == exercises_table.c.exercise_id).\
+        join(workouts_table, workout_exercises_table.c.workout_id == workouts_table.c.hevy_workout_id)
 
-    # Debugging: Log the generated query
-    print(f"Debug: Primary Muscle Volume Query for '{muscle_name}' - {query}")
-
-    # Debugging: Log intermediate results
-    results = db.execute(query).fetchall()
-    print(f"Debug: Primary Muscle Volume Results for '{muscle_name}' - {results}")
+    if conditions:
+        query = query.where(and_(*conditions))
 
     return query
 
 def query_get_secondary_muscle_volume(muscle_name, start_date=None, end_date=None):
     """Returns the total volume for exercises where the muscle is part of the secondary muscle group."""
+    conditions = [
+        func.lower(func.trim(func.replace(exercises_table.c.secondary_muscles, ',', ' '))).like(f"%{muscle_name.lower()}%")
+    ]
+    if start_date:
+        conditions.append(workouts_table.c.start_time >= start_date)
+    if end_date:
+        conditions.append(workouts_table.c.start_time <= end_date)
+
     query = select(
-        func.sum((func.coalesce(sets_table.c.weight_kg, 0) * func.coalesce(sets_table.c.reps, 0))).label('volume')  # Handle NULL values
+        func.sum((func.coalesce(sets_table.c.weight_kg, 0) * func.coalesce(sets_table.c.reps, 0))).label('volume')
     ).\
-        join(exercises_table, sets_table.c.exercise_id == exercises_table.c.exercise_id).\
-        join(workout_exercises_table, workout_exercises_table.c.exercise_id == exercises_table.c.exercise_id).\
-        join(workouts_table, workout_exercises_table.c.workout_id == workouts_table.c.hevy_workout_id).\
-        where(and_(
-            func.lower(func.trim(func.replace(exercises_table.c.secondary_muscles, ',', ' '))).like(f"%{muscle_name.lower()}%"),
-            workouts_table.c.start_time >= start_date if start_date else True,  # Apply start_date filter
-            workouts_table.c.start_time <= end_date if end_date else True       # Apply end_date filter
-        ))
+        join(workout_exercises_table, sets_table.c.exercise_id == workout_exercises_table.c.exercise_id).\
+        join(exercises_table, workout_exercises_table.c.exercise_id == exercises_table.c.exercise_id).\
+        join(workouts_table, workout_exercises_table.c.workout_id == workouts_table.c.hevy_workout_id)
 
-    # Debugging: Log the generated query
-    print(f"Debug: Secondary Muscle Volume Query for '{muscle_name}' - {query}")
-
-    # Debugging: Log intermediate results
-    results = db.execute(query).fetchall()
-    print(f"Debug: Secondary Muscle Volume Results for '{muscle_name}' - {results}")
+    if conditions:
+        query = query.where(and_(*conditions))
 
     return query
 
