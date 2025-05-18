@@ -138,6 +138,9 @@ if page == "Workouts":
             primary_volume = db.execute(primary_volume_query).scalar() or 0
             secondary_volume = db.execute(secondary_volume_query).scalar() or 0
 
+            # Debugging: Log the fetched volumes
+            print(f"Debug: Muscle '{muscle_name}', Primary Volume: {primary_volume}, Secondary Volume: {secondary_volume}")
+
             # Append data for the chart
             volume_data.append({"Muscle Group": muscle_name, "Muscle Role": "Primary Muscle", "Volume": primary_volume})
             volume_data.append({"Muscle Group": muscle_name, "Muscle Role": "Secondary Muscle", "Volume": secondary_volume})

@@ -118,27 +118,47 @@ def query_get_all_diet_cycles(start_date=None, end_date=None):
 def query_get_primary_muscle_volume(muscle_name, start_date=None, end_date=None):
     """Returns the total volume for exercises where the muscle is the primary muscle."""
     query = select(
-        func.sum((func.coalesce(sets_table.c.weight_kg, 0) * 2.20462) * func.coalesce(sets_table.c.reps, 0)).label('volume')  # Handle NULL values
+        func.sum((func.coalesce(sets_table.c.weight_kg, 0) * func.coalesce(sets_table.c.reps, 0))).label('volume')  # Handle NULL values
     ).\
         join(exercises_table, sets_table.c.exercise_id == exercises_table.c.exercise_id).\
         join(workout_exercises_table, workout_exercises_table.c.exercise_id == exercises_table.c.exercise_id).\
         join(workouts_table, workout_exercises_table.c.workout_id == workouts_table.c.hevy_workout_id).\
-        where(func.lower(func.trim(func.replace(exercises_table.c.primary_muscles, ',', ' '))).like(f"%{muscle_name.lower()}%"))  # Split and match
+        where(and_(
+            func.lower(func.trim(func.replace(exercises_table.c.primary_muscles, ',', ' '))).like(f"%{muscle_name.lower()}%"),
+            workouts_table.c.start_time >= start_date if start_date else True,  # Apply start_date filter
+            workouts_table.c.start_time <= end_date if end_date else True       # Apply end_date filter
+        ))
 
-    query = query_apply_date_filter(query, workouts_table, start_date, end_date, date_column='start_time')
+    # Debugging: Log the generated query
+    print(f"Debug: Primary Muscle Volume Query for '{muscle_name}' - {query}")
+
+    # Debugging: Log intermediate results
+    results = db.execute(query).fetchall()
+    print(f"Debug: Primary Muscle Volume Results for '{muscle_name}' - {results}")
+
     return query
 
 def query_get_secondary_muscle_volume(muscle_name, start_date=None, end_date=None):
     """Returns the total volume for exercises where the muscle is part of the secondary muscle group."""
     query = select(
-        func.sum((func.coalesce(sets_table.c.weight_kg, 0) * 2.20462) * func.coalesce(sets_table.c.reps, 0)).label('volume')  # Handle NULL values
+        func.sum((func.coalesce(sets_table.c.weight_kg, 0) * func.coalesce(sets_table.c.reps, 0))).label('volume')  # Handle NULL values
     ).\
         join(exercises_table, sets_table.c.exercise_id == exercises_table.c.exercise_id).\
         join(workout_exercises_table, workout_exercises_table.c.exercise_id == exercises_table.c.exercise_id).\
         join(workouts_table, workout_exercises_table.c.workout_id == workouts_table.c.hevy_workout_id).\
-        where(func.lower(func.trim(func.replace(exercises_table.c.secondary_muscles, ',', ' '))).like(f"%{muscle_name.lower()}%"))  # Split and match
+        where(and_(
+            func.lower(func.trim(func.replace(exercises_table.c.secondary_muscles, ',', ' '))).like(f"%{muscle_name.lower()}%"),
+            workouts_table.c.start_time >= start_date if start_date else True,  # Apply start_date filter
+            workouts_table.c.start_time <= end_date if end_date else True       # Apply end_date filter
+        ))
 
-    query = query_apply_date_filter(query, workouts_table, start_date, end_date, date_column='start_time')
+    # Debugging: Log the generated query
+    print(f"Debug: Secondary Muscle Volume Query for '{muscle_name}' - {query}")
+
+    # Debugging: Log intermediate results
+    results = db.execute(query).fetchall()
+    print(f"Debug: Secondary Muscle Volume Results for '{muscle_name}' - {results}")
+
     return query
 
 def query_get_all_unique_muscle_groups():
@@ -339,6 +359,31 @@ def query_debug_broken_set_relationships():
     ).where(~sets_table.c.exercise_id.in_(select(exercises_table.c.exercise_id)))
     return query
 
+def query_debug_intermediate_results(muscle_name, start_date=None, end_date=None):
+    """Debug query to log intermediate results for primary muscle volume."""
+    query = select(
+        sets_table.c.set_id,
+        sets_table.c.weight_kg,
+        sets_table.c.reps,
+        exercises_table.c.exercise_id,
+        exercises_table.c.primary_muscles,
+        exercises_table.c.secondary_muscles,
+        workouts_table.c.start_time
+    ).\
+        join(exercises_table, sets_table.c.exercise_id == exercises_table.c.exercise_id).\
+        join(workout_exercises_table, workout_exercises_table.c.exercise_id == exercises_table.c.exercise_id).\
+        join(workouts_table, workout_exercises_table.c.workout_id == workouts_table.c.hevy_workout_id).\
+        where(and_(
+            func.lower(func.trim(func.replace(exercises_table.c.primary_muscles, ',', ' '))).like(f"%{muscle_name.lower()}%"),
+            workouts_table.c.start_time >= start_date if start_date else True,
+            workouts_table.c.start_time <= end_date if end_date else True
+        ))
+
+    # Debugging: Log intermediate results
+    results = db.execute(query).fetchall()
+    print(f"Debug: Intermediate Results for '{muscle_name}' - {results}")
+    return results
+
 __all__ = [
     "query_get_all_workouts",
     "query_get_exercises_in_workout",
@@ -369,5 +414,6 @@ __all__ = [
     "query_debug_all_workouts",
     "query_debug_broken_relationships",
     "query_debug_broken_workout_relationships",
-    "query_debug_broken_set_relationships"
+    "query_debug_broken_set_relationships",
+    "query_debug_intermediate_results"
 ]
