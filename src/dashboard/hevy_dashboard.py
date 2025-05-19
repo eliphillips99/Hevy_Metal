@@ -91,6 +91,12 @@ quick_ranges = {
     "All Time": (date(2023, 6, 1), today)  # Data starts from June 2023
 }
 
+# Add a quick access button for the active diet cycle
+active_cycle = query_get_current_diet_cycle()
+if active_cycle:
+    active_cycle_start_date = active_cycle.start_date
+    quick_ranges["Active Diet Cycle"] = (active_cycle_start_date, today)
+
 selected_range = st.sidebar.radio("Select Date Range", list(quick_ranges.keys()))
 start_date, end_date = quick_ranges[selected_range]
 
@@ -278,22 +284,93 @@ elif page == "Sleep":
         # Extract percentages from the query result
         avg_rem, avg_deep, avg_core, avg_awake = sleep_percentages
 
-        # Prepare data for the pie chart
-        pie_chart_data = pd.DataFrame({
+        # Prepare data for the actual sleep pie chart
+        actual_pie_chart_data = pd.DataFrame({
             "Sleep Stage": ["REM Sleep", "Deep Sleep", "Core Sleep", "Awake Time"],
             "Average Percentage (%)": [avg_rem, avg_deep, avg_core, avg_awake]
         })
 
-        # Create a pie chart
-        pie_chart = alt.Chart(pie_chart_data).mark_arc().encode(
+        # Create the actual sleep pie chart
+        actual_pie_chart = alt.Chart(actual_pie_chart_data).mark_arc().encode(
             theta=alt.Theta(field="Average Percentage (%)", type="quantitative"),
             color=alt.Color(field="Sleep Stage", type="nominal"),
             tooltip=["Sleep Stage", "Average Percentage (%)"]
         ).properties(
-            title="Average Sleep Stage Distribution (%)"
+            title="Actual Sleep Stage Distribution (%)"
         )
 
-        st.altair_chart(pie_chart, use_container_width=True)
+        # Prepare data for the ideal sleep pie chart
+        ideal_pie_chart_data = pd.DataFrame({
+            "Sleep Stage": ["REM Sleep", "Deep Sleep", "Core Sleep", "Awake Time"],
+            "Ideal Percentage (%)": [22.5, 22.5, 45.0, 10.0]
+        })
+
+        # Create the ideal sleep pie chart
+        ideal_pie_chart = alt.Chart(ideal_pie_chart_data).mark_arc().encode(
+            theta=alt.Theta(field="Ideal Percentage (%)", type="quantitative"),
+            color=alt.Color(field="Sleep Stage", type="nominal"),
+            tooltip=["Sleep Stage", "Ideal Percentage (%)"]
+        ).properties(
+            title="Ideal Sleep Stage Distribution (%)"
+        )
+
+        # Display the charts side by side
+        st.altair_chart(actual_pie_chart | ideal_pie_chart, use_container_width=True)
+
+        # Prepare data for the comparison scatter plot
+        comparison_data = pd.DataFrame({
+            "Sleep Stage": ["Awake Time", "Core Sleep", "REM Sleep", "Deep Sleep"] * 2,
+            "Type": ["Actual"] * 4 + ["Ideal"] * 4,
+            "Percentage of Sleep": [
+                avg_awake, avg_core, avg_rem, avg_deep,
+                10, 45, 22.5, 22.5
+            ]
+        })
+
+        # Calculate the difference between actual and ideal percentages
+        difference_data = pd.DataFrame({
+            "Sleep Stage": ["Awake Time", "Core Sleep", "REM Sleep", "Deep Sleep"],
+            "Actual": [avg_awake, avg_core, avg_rem, avg_deep],
+            "Ideal": [10, 45, 22.5, 22.5],
+            "Difference (Percentage Points)": [
+                avg_awake - 10, avg_core - 45, avg_rem - 22.5, avg_deep - 22.5
+            ]
+        })
+
+        # Create a scatter plot to compare actual and ideal sleep data
+        comparison_chart = alt.Chart(comparison_data).mark_point(size=100).encode(
+            x=alt.X("Sleep Stage:N", title="Sleep Stage", axis=alt.Axis(labelAngle=0)),
+            y=alt.Y("Percentage of Sleep:Q", title="Percentage of Sleep (%)", scale=alt.Scale(domain=[0, 100])),
+            color=alt.Color("Type:N", title="Type"),  # Different colors for "Actual" and "Ideal"
+            shape=alt.Shape("Type:N", title="Type"),  # Different shapes for "Actual" and "Ideal"
+            tooltip=["Sleep Stage:N", "Type:N", alt.Tooltip("Percentage of Sleep:Q", format=".1f", title="Percentage (%)")]  # Show percentages in tooltips
+        )
+
+        # Create vertical lines connecting Actual and Ideal points
+        difference_lines = alt.Chart(difference_data).mark_rule().encode(
+            x=alt.X("Sleep Stage:N"),
+            y=alt.Y("Actual:Q"),
+            y2="Ideal:Q",
+            color=alt.value("white"),  # Color for the lines
+            tooltip=["Sleep Stage:N", alt.Tooltip("Difference (Percentage Points):Q", format=".1f", title="Difference (pts)")],
+        ).properties(
+            title="Comparison of Actual vs Ideal Sleep (%) with Differences"
+        )
+
+        # Add text labels for the percentage point differences
+        difference_labels = alt.Chart(difference_data).mark_text(
+            align="left", dx=5, dy=0, fontSize=12, color="white", fontWeight="bold"
+        ).encode(
+            x=alt.X("Sleep Stage:N"),
+            y=alt.Y("Actual:Q"),
+            text=alt.Text("Difference (Percentage Points):Q", format=".1f")
+        )
+
+        # Combine the scatter plot, vertical lines, and labels
+        combined_chart = comparison_chart + difference_lines + difference_labels
+
+        # Display the combined chart
+        st.altair_chart(combined_chart, use_container_width=True)
     else:
         st.info("No sleep percentage data available for the selected date range.")
 
