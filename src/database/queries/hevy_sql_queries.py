@@ -51,7 +51,7 @@ def query_get_sets_for_exercise_in_workout(workout_id, exercise_name):
         sets_table.c.weight_kg,
         sets_table.c.reps
     ).\
-        join(workout_exercises_table, sets_table.c.workout_exercise_id == workout_exercises_table.c.workout_exercise_id).\
+        join(workout_exercises_table, sets_table.c.exercise_id == workout_exercises_table.c.exercise_id).\
         join(exercises_table, workout_exercises_table.c.exercise_id == exercises_table.c.exercise_id).\
         where(and_(workout_exercises_table.c.workout_id == workout_id, exercises_table.c.exercise_name == exercise_name)).\
         order_by(sets_table.c.set_index)
@@ -371,6 +371,83 @@ def query_debug_intermediate_results(muscle_name, start_date=None, end_date=None
     print(f"Debug: Intermediate Results for '{muscle_name}' - {results}")
     return results
 
+def query_get_one_rm_for_exercise(exercise_name, start_date=None, end_date=None):
+    """
+    Returns the date, weight, and reps of the set that achieved the 1RM for the given exercise.
+    """
+    query = select(
+        workouts_table.c.start_time.label("date"),
+        sets_table.c.weight_kg.label("weight"),
+        sets_table.c.reps.label("reps")
+    ).join(
+        workout_exercises_table, sets_table.c.exercise_id == workout_exercises_table.c.exercise_id
+    ).join(
+        exercises_table, workout_exercises_table.c.exercise_id == exercises_table.c.exercise_id
+    ).join(
+        workouts_table, workout_exercises_table.c.workout_id == workouts_table.c.workout_id
+    ).where(
+        exercises_table.c.exercise_name.ilike(exercise_name),
+        sets_table.c.reps > 0  # Ensure reps are greater than 0
+    )
+
+    # Apply date range filter using query_apply_date_filter
+    query = query_apply_date_filter(query, workouts_table, start_date, end_date, date_column='start_time')
+
+    query = query.order_by(
+        (sets_table.c.weight_kg * (1 + (sets_table.c.reps / 30))).desc()  # Calculate 1RM using Epley formula
+    ).limit(1)
+
+    return query
+
+def query_get_heaviest_weight_for_exercise(exercise_name, start_date=None, end_date=None):
+    """
+    Returns the date and weight of the heaviest weight ever used for the given exercise.
+    """
+    query = select(
+        workouts_table.c.start_time.label("date"),
+        sets_table.c.weight_kg.label("weight")
+    ).join(
+        workout_exercises_table, sets_table.c.exercise_id == workout_exercises_table.c.exercise_id
+    ).join(
+        exercises_table, workout_exercises_table.c.exercise_id == exercises_table.c.exercise_id
+    ).join(
+        workouts_table, workout_exercises_table.c.workout_id == workouts_table.c.workout_id
+    ).where(
+        exercises_table.c.exercise_name.ilike(exercise_name),
+        sets_table.c.weight_kg.isnot(None)  # Ensure weight is not null
+    )
+
+    # Apply date range filter using query_apply_date_filter
+    query = query_apply_date_filter(query, workouts_table, start_date, end_date, date_column='start_time')
+
+    query = query.order_by(
+        sets_table.c.weight_kg.desc()  # Order by weight in descending order
+    ).limit(1)
+
+    return query
+
+def query_debug_sets_with_exercise_and_workout_details():
+    """Debug query to fetch all rows from sets_table with related exercise and workout details."""
+    query = select(
+        sets_table.c.set_id,
+        sets_table.c.weight_kg,
+        sets_table.c.reps,
+        exercises_table.c.exercise_name,
+        workouts_table.c.start_time
+    ).join(
+        exercises_table, sets_table.c.exercise_id == exercises_table.c.exercise_id  # Corrected join condition
+    ).join(
+        workout_exercises_table, exercises_table.c.exercise_id == workout_exercises_table.c.exercise_id  # Corrected join condition
+    ).join(
+        workouts_table, workout_exercises_table.c.workout_id == workouts_table.c.hevy_workout_id  # Updated join condition
+    )
+
+    # Debug: Log the generated SQL query
+    print(f"Generated SQL Query: {query}")
+
+    # Return the query object instead of executing it
+    return query
+
 __all__ = [
     "query_get_all_workouts",
     "query_get_exercises_in_workout",
@@ -400,5 +477,8 @@ __all__ = [
     "query_debug_broken_relationships",
     "query_debug_broken_workout_relationships",
     "query_debug_broken_set_relationships",
-    "query_debug_intermediate_results"
+    "query_debug_intermediate_results",
+    "query_get_one_rm_for_exercise",
+    "query_get_heaviest_weight_for_exercise",
+    "query_debug_sets_with_exercise_and_workout_details"
 ]

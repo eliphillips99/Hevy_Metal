@@ -51,7 +51,17 @@ from src.database.queries.hevy_sql_queries import (
     query_debug_all_workouts,  # Ensure this is included
     query_debug_broken_relationships,  # Ensure this is included
     query_debug_broken_workout_relationships,  # Ensure this is included
-    query_debug_broken_set_relationships  # Ensure this is included
+    query_debug_broken_set_relationships,  # Ensure this is included
+    query_get_one_rm_for_exercise,  # Ensure this is included
+    query_get_heaviest_weight_for_exercise,  # Ensure this is included
+    query_debug_sets_with_exercise_and_workout_details  # Ensure this is included
+)
+
+from src.database.schema import (
+    exercises_table,
+    workouts_table,
+    workout_exercises_table,
+    sets_table
 )
 
 # Create a database session
@@ -118,6 +128,24 @@ if page == "Workouts":
 
     st.title("Muscle Group Volume")
 
+    # Debug: Fetch all rows from sets_table with related exercise and workout details
+    debug_sets_query = query_debug_sets_with_exercise_and_workout_details()
+    debug_sets_result = db.execute(debug_sets_query).fetchall()
+    print(f"Debug: Sets with Related Exercise and Workout Details - {debug_sets_result}")
+
+    # Debug: Fetch all unique exercise names
+    unique_exercises_query = select(exercises_table.c.exercise_name).distinct()
+    unique_exercises = db.execute(unique_exercises_query).fetchall()
+    print(f"Debug: Unique Exercises in Database - {[row[0] for row in unique_exercises]}")
+
+    # Debug: Fetch all workouts in the selected date range
+    workouts_query = select(workouts_table.c.start_time, workouts_table.c.workout_name).where(
+        workouts_table.c.start_time >= start_date,
+        workouts_table.c.start_time <= end_date
+    )
+    workouts_in_range = db.execute(workouts_query).fetchall()
+    print(f"Debug: Workouts in Date Range ({start_date} to {end_date}) - {workouts_in_range}")
+
     # Fetch all unique muscle groups from the database
     all_muscle_groups_query = query_get_all_unique_muscle_groups()
     all_muscle_groups = [row[0] for row in db.execute(all_muscle_groups_query).fetchall() if row[0]]
@@ -171,6 +199,83 @@ if page == "Workouts":
             st.info("No volume data available for the selected muscle groups and date range.")
     else:
         st.info("Select at least one muscle group to view its volume.")
+
+    # Display 1RM and heaviest weight for key exercises
+    st.title("1RM and Heaviest Weight for Key Exercises")
+
+    # Ensure exercise names match the database values
+    key_exercises = ["Bench Press (Barbell)", "Squat (Belt)", "Bicep Curl (Barbell)"]
+    records = []
+
+    for exercise in key_exercises:
+        # Debug: Fetch all sets for the exercise in the selected date range
+        sets_query = select(
+            sets_table.c.weight_kg,
+            sets_table.c.reps,
+            workouts_table.c.start_time
+        ).join(
+            workout_exercises_table, sets_table.c.exercise_id == workout_exercises_table.c.exercise_id
+        ).join(
+            exercises_table, workout_exercises_table.c.exercise_id == exercises_table.c.exercise_id
+        ).join(
+            workouts_table, workout_exercises_table.c.workout_id == workouts_table.c.workout_id
+        ).where(
+            exercises_table.c.exercise_name.ilike(exercise),
+            workouts_table.c.start_time >= start_date,
+            workouts_table.c.start_time <= end_date
+        )
+        sets_in_range = db.execute(sets_query).fetchall()
+        print(f"Debug: Sets for '{exercise}' in Date Range ({start_date} to {end_date}) - {sets_in_range}")
+
+        # Query the 1RM (One-Rep Max) and the set details
+        one_rm_query = query_get_one_rm_for_exercise(exercise, start_date, end_date)
+        print(f"Debug: Executing 1RM query for exercise '{exercise}' with date range {start_date} to {end_date}")
+        print(f"Debug: Query - {one_rm_query}")
+        one_rm_result = db.execute(one_rm_query).fetchone()
+        print(f"Debug: 1RM Result for '{exercise}' - {one_rm_result}")
+
+        # Query the heaviest weight ever used and the set details
+        heaviest_weight_query = query_get_heaviest_weight_for_exercise(exercise, start_date, end_date)
+        print(f"Debug: Executing heaviest weight query for exercise '{exercise}' with date range {start_date} to {end_date}")
+        print(f"Debug: Query - {heaviest_weight_query}")
+        heaviest_weight_result = db.execute(heaviest_weight_query).fetchone()
+        print(f"Debug: Heaviest Weight Result for '{exercise}' - {heaviest_weight_result}")
+
+        # Handle null results gracefully
+        if one_rm_result:
+            one_rm_date, one_rm_weight_kg, one_rm_reps = one_rm_result
+            one_rm_weight = round(one_rm_weight_kg * 2.20462, 2)  # Convert to pounds
+            calculated_one_rm = round(one_rm_weight / (1.0278 - (0.0278 * one_rm_reps)), 2) if one_rm_reps > 0 else None
+        else:
+            one_rm_date, one_rm_weight, one_rm_reps, calculated_one_rm = None, None, None, None
+
+        if heaviest_weight_result:
+            heaviest_weight_date, heaviest_weight_kg = heaviest_weight_result
+            heaviest_weight = round(heaviest_weight_kg * 2.20462, 2)  # Convert to pounds
+        else:
+            heaviest_weight_date, heaviest_weight = None, None
+
+        # Add debug logs for final record
+        print(f"Debug: Final Record for '{exercise}' - 1RM: {one_rm_weight} lbs, Heaviest: {heaviest_weight} lbs")
+
+        records.append({
+            "Exercise": exercise,
+            "1RM Weight (lbs)": one_rm_weight,
+            "1RM Reps": one_rm_reps,
+            "Calculated 1RM (lbs)": calculated_one_rm,
+            "1RM Date": one_rm_date,
+            "Heaviest Weight (lbs)": heaviest_weight,
+            "Heaviest Weight Date": heaviest_weight_date
+        })
+
+    # Create a DataFrame for the records
+    records_df = pd.DataFrame(records)
+
+    # Ensure the DataFrame is not empty before displaying
+    if not records_df.empty:
+        st.table(records_df)
+    else:
+        st.info("No 1RM or heaviest weight data available for the selected exercises and date range.")
 
 elif page == "Nutrition":
     st.title("Protein Per Day")
