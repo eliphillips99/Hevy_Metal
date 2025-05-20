@@ -384,7 +384,7 @@ def query_get_one_rm_for_exercise(exercise_name, start_date=None, end_date=None)
     ).join(
         exercises_table, workout_exercises_table.c.exercise_id == exercises_table.c.exercise_id
     ).join(
-        workouts_table, workout_exercises_table.c.workout_id == workouts_table.c.workout_id
+        workouts_table, workout_exercises_table.c.workout_id == workouts_table.c.hevy_workout_id  # Corrected join
     ).where(
         exercises_table.c.exercise_name.ilike(exercise_name),
         sets_table.c.reps > 0  # Ensure reps are greater than 0
@@ -397,6 +397,8 @@ def query_get_one_rm_for_exercise(exercise_name, start_date=None, end_date=None)
         (sets_table.c.weight_kg * (1 + (sets_table.c.reps / 30))).desc()  # Calculate 1RM using Epley formula
     ).limit(1)
 
+    # Debug: Log the generated query
+    print(f"Debug: Generated 1RM Query for '{exercise_name}' - {query}")
     return query
 
 def query_get_heaviest_weight_for_exercise(exercise_name, start_date=None, end_date=None):
@@ -411,7 +413,7 @@ def query_get_heaviest_weight_for_exercise(exercise_name, start_date=None, end_d
     ).join(
         exercises_table, workout_exercises_table.c.exercise_id == exercises_table.c.exercise_id
     ).join(
-        workouts_table, workout_exercises_table.c.workout_id == workouts_table.c.workout_id
+        workouts_table, workout_exercises_table.c.workout_id == workouts_table.c.hevy_workout_id  # Corrected join
     ).where(
         exercises_table.c.exercise_name.ilike(exercise_name),
         sets_table.c.weight_kg.isnot(None)  # Ensure weight is not null
@@ -424,6 +426,8 @@ def query_get_heaviest_weight_for_exercise(exercise_name, start_date=None, end_d
         sets_table.c.weight_kg.desc()  # Order by weight in descending order
     ).limit(1)
 
+    # Debug: Log the generated query
+    print(f"Debug: Generated Heaviest Weight Query for '{exercise_name}' - {query}")
     return query
 
 def query_debug_sets_with_exercise_and_workout_details():

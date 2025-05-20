@@ -208,6 +208,9 @@ if page == "Workouts":
     records = []
 
     for exercise in key_exercises:
+        # Debug: Log the exercise being processed
+        print(f"Debug: Processing exercise '{exercise}'")
+
         # Debug: Fetch all sets for the exercise in the selected date range
         sets_query = select(
             sets_table.c.weight_kg,
@@ -218,7 +221,7 @@ if page == "Workouts":
         ).join(
             exercises_table, workout_exercises_table.c.exercise_id == exercises_table.c.exercise_id
         ).join(
-            workouts_table, workout_exercises_table.c.workout_id == workouts_table.c.workout_id
+            workouts_table, workout_exercises_table.c.workout_id == workouts_table.c.hevy_workout_id  # Corrected join
         ).where(
             exercises_table.c.exercise_name.ilike(exercise),
             workouts_table.c.start_time >= start_date,
