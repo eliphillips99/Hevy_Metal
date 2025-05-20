@@ -91,68 +91,77 @@ def insert_raw_data(cursor, metric_name, metric_units, metric_data):
             print(f"Error inserting data for metric '{metric_name}': {e}")
 
 def pull_sleep_from_json(metric_data, cursor):
-
     for sleep_entry in metric_data:
-                start_time = sleep_entry.get("sleepStart")
-                end_time = sleep_entry.get("sleepEnd")
-                in_bed_duration = sleep_entry.get("inBed")
-                sleep_duration = sleep_entry.get("asleep")
-                awake_duration = sleep_entry.get("awake")
-                rem_duration = sleep_entry.get("rem")
-                deep_duration = sleep_entry.get("deep")
-                core_duration = sleep_entry.get("core")
-                in_bed_start = sleep_entry.get("inBedStart")
-                in_bed_end = sleep_entry.get("inBedEnd")
-                source = sleep_entry.get("source", "Unknown")
+        start_time = sleep_entry.get("sleepStart")
+        end_time = sleep_entry.get("sleepEnd")
+        in_bed_duration = sleep_entry.get("inBed")
+        sleep_duration = sleep_entry.get("asleep")
+        awake_duration = sleep_entry.get("awake")
+        rem_duration = sleep_entry.get("rem")
+        deep_duration = sleep_entry.get("deep")
+        core_duration = sleep_entry.get("core")
+        in_bed_start = sleep_entry.get("inBedStart")
+        in_bed_end = sleep_entry.get("inBedEnd")
+        source = sleep_entry.get("source", "Unknown")
 
+        # Convert times to datetime objects
+        try:
+            start_timestamp = datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S %z")
+            end_timestamp = datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S %z")
+            in_bed_start_timestamp = datetime.strptime(in_bed_start, "%Y-%m-%d %H:%M:%S %z") if in_bed_start else None
+            in_bed_end_timestamp = datetime.strptime(in_bed_end, "%Y-%m-%d %H:%M:%S %z") if in_bed_end else None
+        except ValueError as e:
+            print(f"Error parsing sleep cycle times: {e}")
+            continue
 
-                # Convert times to datetime objects
-                try:
-                    start_timestamp = datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S %z")
-                    end_timestamp = datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S %z")
-                    in_bed_start_timestamp = datetime.strptime(in_bed_start, "%Y-%m-%d %H:%M:%S %z") if in_bed_start else None
-                    in_bed_end_timestamp = datetime.strptime(in_bed_end, "%Y-%m-%d %H:%M:%S %z") if in_bed_end else None
-                except ValueError as e:
-                    print(f"Error parsing sleep cycle times: {e}")
-                    continue
+        # Adjust in-bed and sleep durations based on the provided logic
+        if in_bed_duration == 0 or sleep_duration == 0:
+            if in_bed_duration == 0 and sleep_duration > 0:
+                in_bed_duration = sleep_duration
+            elif sleep_duration == 0 and in_bed_duration > 0:
+                sleep_duration = in_bed_duration
+            elif in_bed_duration == 0 and sleep_duration == 0:
+                calculated_duration = max(
+                    (rem_duration or 0) + (deep_duration or 0) + (core_duration or 0) - (awake_duration or 0), 0
+                )
+                in_bed_duration = calculated_duration
+                sleep_duration = calculated_duration
 
-                # Get or create the common_data_id
-                common_data_id = get_or_create_common_data_id(cursor, start_timestamp, source)
+        # Get or create the common_data_id
+        common_data_id = get_or_create_common_data_id(cursor, start_timestamp, source)
 
+        cursor.execute("""
+            SELECT 1 FROM sleep_data
+            WHERE common_data_id = ? AND start_time = ? AND end_time = ?
+        """, (common_data_id, start_timestamp, end_timestamp))
 
+        if cursor.fetchone() is None:
+            # Insert into the sleep_data table
+            try:
                 cursor.execute("""
-                    SELECT 1 FROM sleep_data
-                    WHERE common_data_id = ? AND start_time = ? AND end_time = ?
-                """, (common_data_id, start_timestamp, end_timestamp))
-
-                if cursor.fetchone() is None:
-                # Insert into the sleep_data table
-                    try:
-                        cursor.execute("""
-                            INSERT INTO sleep_data (
-                                common_data_id, start_time, end_time, in_bed_duration_hours, sleep_duration_hours,
-                                awake_duration_hours, rem_sleep_duration_hours, deep_sleep_duration_hours,
-                                core_sleep_duration_hours, in_bed_start, in_bed_end, created_at, updated_at
-                            )
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                        """, (
-                            common_data_id,
-                            start_timestamp.strftime("%Y-%m-%d %H:%M:%S %z"),
-                            end_timestamp.strftime("%Y-%m-%d %H:%M:%S %z"),
-                            in_bed_duration,
-                            sleep_duration,
-                            awake_duration,
-                            rem_duration,
-                            deep_duration,
-                            core_duration,
-                            in_bed_start_timestamp.strftime("%Y-%m-%d %H:%M:%S %z") if in_bed_start_timestamp else None,
-                            in_bed_end_timestamp.strftime("%Y-%m-%d %H:%M:%S %z") if in_bed_end_timestamp else None,
-                            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                            datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                        ))
-                        #print(f"Inserted sleep cycle: Start: {start_time}, End: {end_time}, Source: {source}")
-                    except sqlite3.IntegrityError as e:
-                        print(f"Error inserting sleep cycle data: {e}")
+                    INSERT INTO sleep_data (
+                        common_data_id, start_time, end_time, in_bed_duration_hours, sleep_duration_hours,
+                        awake_duration_hours, rem_sleep_duration_hours, deep_sleep_duration_hours,
+                        core_sleep_duration_hours, in_bed_start, in_bed_end, created_at, updated_at
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    common_data_id,
+                    start_timestamp.strftime("%Y-%m-%d %H:%M:%S %z"),
+                    end_timestamp.strftime("%Y-%m-%d %H:%M:%S %z"),
+                    in_bed_duration,
+                    sleep_duration,
+                    awake_duration,
+                    rem_duration,
+                    deep_duration,
+                    core_duration,
+                    in_bed_start_timestamp.strftime("%Y-%m-%d %H:%M:%S %z") if in_bed_start_timestamp else None,
+                    in_bed_end_timestamp.strftime("%Y-%m-%d %H:%M:%S %z") if in_bed_end_timestamp else None,
+                    datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                ))
+            except sqlite3.IntegrityError as e:
+                print(f"Error inserting sleep cycle data: {e}")
 
 def pull_nutrition_from_json(metric_data, metric_name, cursor, nutrition_data_grouped):
     for entry in metric_data:
@@ -247,7 +256,6 @@ def pull_nutrition_from_json(metric_data, metric_name, cursor, nutrition_data_gr
             ))
 
 def pull_markers_from_json(metric_data, metric_name, cursor, markers_data_grouped):
-    print(f"Processing metric: {metric_name}")
     for entry in metric_data:
         date = entry.get("date")
         source = entry.get("source", "Unknown")
@@ -321,12 +329,6 @@ def pull_markers_from_json(metric_data, metric_name, cursor, markers_data_groupe
 
         # Get or create the common_data_id
         common_data_id = get_or_create_common_data_id(cursor, timestamp, source)
-
-        # Debugging: Print the data point before adding it to the database
-        print(f"Preparing to insert/update health marker row:")
-        print(f"  Date: {timestamp}")
-        print(f"  Source: {source}")
-        print(f"  Values: {marker_values}")
 
         # Check if a row already exists for this common_data_id
         cursor.execute("""
@@ -411,13 +413,11 @@ def import_daily_data(data, conn):
     # Import metrics data
     for metric in data.get("metrics", []):
         metric_name = metric.get("name")
-        print(f"Found metric: {metric_name}")
 
         metric_units = metric.get("units")
         metric_data = metric.get("data", [])
         # Translate metric name using the mapping
         metric_name = METRIC_NAME_MAPPING.get(metric_name, metric_name)
-        print(f"Translated Metric Name: {metric_name}")
         #print(f"Processing metric: {metric_name} with units: {metric_units}")
         #print(f"Mapped Metric Name: {metric_name}, Original Name: {metric.get('name')}")
         insert_raw_data(cursor, metric_name, metric_units, metric_data)
@@ -426,7 +426,6 @@ def import_daily_data(data, conn):
             pull_sleep_from_json(metric_data, cursor)
 
         elif metric_name in nutrition_metrics:
-            print(f"Calling pull_nutrition_from_json for Metric: {metric_name}")
             pull_nutrition_from_json(metric_data, metric_name, cursor, nutrition_data_grouped)
 
         elif metric_name in markers_metrics:

@@ -3,7 +3,9 @@ from src.database.queries.hevy_sql_queries import (
     query_get_exercises_in_workout,
     query_get_sets_for_exercise_in_workout,
     query_get_all_unique_exercise_names,
-    query_get_exercise_counts
+    query_get_exercise_counts,
+    query_get_primary_muscle_volume,
+    query_get_secondary_muscle_volume
 )
 from src.database.queries.sleep_queries import query_get_sleep_data
 from src.database.queries.nutrition_queries import query_get_nutrition_data
@@ -16,12 +18,15 @@ from src.database.queries.diet_cycles_queries import (
 )
 from sqlalchemy.orm import Session
 from src.database.connection import engine
+import matplotlib.pyplot as plt
+from src.database.database_utils import apply_date_filter
 
 # Initialize the database session
 db = Session(bind=engine)
 
 def display_all_workouts(start_date=None, end_date=None):
-    workouts = query_get_all_workouts(start_date, end_date)
+    workouts_query = query_get_all_workouts(start_date, end_date)
+    workouts = db.execute(workouts_query).fetchall()
     for workout in workouts:
         print(workout)
 
@@ -36,12 +41,14 @@ def display_sets_for_exercise(workout_id, exercise_name):
         print(set_data)
 
 def display_unique_exercise_names(start_date=None, end_date=None):
-    exercises = query_get_all_unique_exercise_names(start_date, end_date)
+    exercises_query = query_get_all_unique_exercise_names(start_date, end_date)
+    exercises = db.execute(exercises_query).fetchall()
     for exercise in exercises:
         print(exercise.exercise_name)
 
 def display_exercise_counts(start_date=None, end_date=None):
-    counts = query_get_exercise_counts(start_date, end_date)
+    counts_query = query_get_exercise_counts(start_date, end_date)
+    counts = db.execute(counts_query).fetchall()
     for count in counts:
         print(f"{count.exercise_name}: {count.occurrence_count}")
 
@@ -65,7 +72,8 @@ def display_current_diet_cycle():
     print(current_cycle)
 
 def display_all_diet_cycles(start_date=None, end_date=None):
-    cycles = query_get_all_diet_cycles(start_date, end_date)
+    cycles_query = query_get_all_diet_cycles(start_date, end_date)
+    cycles = db.execute(cycles_query).fetchall()
     for cycle in cycles:
         print(cycle)
 
@@ -76,3 +84,20 @@ def add_diet_cycle(start_date, cycle_type, end_date=None, notes=None):
 def end_diet_cycle(cycle_id, end_date):
     query_update_diet_cycle_end_date(cycle_id, end_date)
     print(f"Diet cycle {cycle_id} ended on {end_date}.")
+
+def display_muscle_group_volume(muscle_name, start_date=None, end_date=None):
+    """Displays a bar chart of exercise volume for a muscle group."""
+    primary_volume_query = query_get_primary_muscle_volume(muscle_name, start_date, end_date)
+    secondary_volume_query = query_get_secondary_muscle_volume(muscle_name, start_date, end_date)
+
+    primary_volume = db.execute(primary_volume_query).scalar() or 0
+    secondary_volume = db.execute(secondary_volume_query).scalar() or 0
+
+    # Create bar chart
+    labels = ['Primary Muscle', 'Secondary Muscle']
+    volumes = [primary_volume, secondary_volume]
+
+    plt.bar(labels, volumes, color=['blue', 'orange'])
+    plt.title(f"Exercise Volume for {muscle_name.capitalize()} ({start_date} to {end_date})")
+    plt.ylabel("Volume (Weight x Reps)")
+    plt.show()

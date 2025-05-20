@@ -71,3 +71,32 @@ def query_get_sleep_stats(start_date=None, end_date=None):
     print(query)
 
     return db.execute(query).fetchone()
+
+def query_get_sleep_cycle_percentages(start_date=None, end_date=None):
+    """
+    Query to calculate the average percentage of time spent in each sleep cycle per night.
+    """
+    query = select(
+        func.avg((sleep_data_table.c.rem_sleep_duration_hours / sleep_data_table.c.sleep_duration_hours) * 100).label("Avg REM Sleep (%)"),
+        func.avg((sleep_data_table.c.deep_sleep_duration_hours / sleep_data_table.c.sleep_duration_hours) * 100).label("Avg Deep Sleep (%)"),
+        func.avg((sleep_data_table.c.core_sleep_duration_hours / sleep_data_table.c.sleep_duration_hours) * 100).label("Avg Core Sleep (%)"),
+        func.avg((sleep_data_table.c.awake_duration_hours / sleep_data_table.c.sleep_duration_hours) * 100).label("Avg Awake Time (%)")
+    ).join(
+        common_data, sleep_data_table.c.common_data_id == common_data.c.common_data_id
+    ).where(
+        sleep_data_table.c.sleep_duration_hours > 0  # Avoid division by zero
+    )
+
+    if start_date or end_date:
+        conditions = []
+        if start_date:
+            conditions.append(common_data.c.date >= start_date)
+        if end_date:
+            conditions.append(common_data.c.date <= end_date)
+        query = query.where(and_(*conditions))
+
+    # Debugging: Log the generated query
+    print("Generated Sleep Cycle Percentages Query:")
+    print(query)
+
+    return db.execute(query).fetchone()
