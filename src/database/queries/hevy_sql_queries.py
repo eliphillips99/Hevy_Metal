@@ -373,61 +373,60 @@ def query_debug_intermediate_results(muscle_name, start_date=None, end_date=None
 
 def query_get_one_rm_for_exercise(exercise_name, start_date=None, end_date=None):
     """
-    Returns the date, weight, and reps of the set that achieved the 1RM for the given exercise.
+    Returns the highest calculated 1RM for the given exercise within the specified date range.
     """
     query = select(
+        sets_table.c.set_id,
         workouts_table.c.start_time.label("date"),
         sets_table.c.weight_kg.label("weight"),
-        sets_table.c.reps.label("reps")
+        sets_table.c.reps.label("reps"),
+        (sets_table.c.weight_kg * (1 + (sets_table.c.reps / 30))).label("calculated_1rm")  # Epley formula
     ).join(
         workout_exercises_table, sets_table.c.exercise_id == workout_exercises_table.c.exercise_id
     ).join(
         exercises_table, workout_exercises_table.c.exercise_id == exercises_table.c.exercise_id
     ).join(
-        workouts_table, workout_exercises_table.c.workout_id == workouts_table.c.hevy_workout_id  # Corrected join
+        workouts_table, workout_exercises_table.c.workout_id == workouts_table.c.workout_id
     ).where(
-        exercises_table.c.exercise_name.ilike(exercise_name),
+        exercises_table.c.exercise_name.ilike(exercise_name),  # Match exercise name
         sets_table.c.reps > 0  # Ensure reps are greater than 0
     )
 
-    # Apply date range filter using query_apply_date_filter
+    # Apply date range filter
     query = query_apply_date_filter(query, workouts_table, start_date, end_date, date_column='start_time')
 
-    query = query.order_by(
-        (sets_table.c.weight_kg * (1 + (sets_table.c.reps / 30))).desc()  # Calculate 1RM using Epley formula
-    ).limit(1)
+    # Order by calculated 1RM in descending order to get the highest
+    query = query.order_by((sets_table.c.weight_kg * (1 + (sets_table.c.reps / 30))).desc())
 
-    # Debug: Log the generated query
-    print(f"Debug: Generated 1RM Query for '{exercise_name}' - {query}")
     return query
 
 def query_get_heaviest_weight_for_exercise(exercise_name, start_date=None, end_date=None):
     """
-    Returns the date and weight of the heaviest weight ever used for the given exercise.
+    Returns the heaviest weight ever used for the given exercise and the earliest date it was achieved.
     """
-    query = select(
-        workouts_table.c.start_time.label("date"),
-        sets_table.c.weight_kg.label("weight")
+    subquery = select(
+        sets_table.c.weight_kg.label("weight"),
+        workouts_table.c.start_time.label("date")
     ).join(
         workout_exercises_table, sets_table.c.exercise_id == workout_exercises_table.c.exercise_id
     ).join(
         exercises_table, workout_exercises_table.c.exercise_id == exercises_table.c.exercise_id
     ).join(
-        workouts_table, workout_exercises_table.c.workout_id == workouts_table.c.hevy_workout_id  # Corrected join
+        workouts_table, workout_exercises_table.c.workout_id == workouts_table.c.workout_id
     ).where(
         exercises_table.c.exercise_name.ilike(exercise_name),
         sets_table.c.weight_kg.isnot(None)  # Ensure weight is not null
     )
 
-    # Apply date range filter using query_apply_date_filter
-    query = query_apply_date_filter(query, workouts_table, start_date, end_date, date_column='start_time')
+    # Apply date range filter
+    subquery = query_apply_date_filter(subquery, workouts_table, start_date, end_date, date_column='start_time')
 
-    query = query.order_by(
-        sets_table.c.weight_kg.desc()  # Order by weight in descending order
-    ).limit(1)
+    # Find the max weight and the earliest date it was achieved
+    query = select(
+        func.max(subquery.c.weight).label("max_weight"),
+        func.min(subquery.c.date).label("earliest_date")
+    ).select_from(subquery)
 
-    # Debug: Log the generated query
-    print(f"Debug: Generated Heaviest Weight Query for '{exercise_name}' - {query}")
     return query
 
 def query_debug_sets_with_exercise_and_workout_details():

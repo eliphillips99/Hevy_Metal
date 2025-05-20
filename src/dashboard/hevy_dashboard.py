@@ -203,73 +203,49 @@ if page == "Workouts":
     # Display 1RM and heaviest weight for key exercises
     st.title("1RM and Heaviest Weight for Key Exercises")
 
-    # Ensure exercise names match the database values
-    key_exercises = ["Bench Press (Barbell)", "Squat (Belt)", "Bicep Curl (Barbell)"]
+    key_exercises = ["Bench Press (Barbell)", "Squat (Belt)", "Bicep Curl (Barbell)", "Leg Extension (Machine)", "Lat Pulldown (Side Grip)"]
     records = []
 
     for exercise in key_exercises:
-        # Debug: Log the exercise being processed
-        print(f"Debug: Processing exercise '{exercise}'")
-
-        # Debug: Fetch all sets for the exercise in the selected date range
-        sets_query = select(
-            sets_table.c.weight_kg,
-            sets_table.c.reps,
-            workouts_table.c.start_time
-        ).join(
-            workout_exercises_table, sets_table.c.exercise_id == workout_exercises_table.c.exercise_id
-        ).join(
-            exercises_table, workout_exercises_table.c.exercise_id == exercises_table.c.exercise_id
-        ).join(
-            workouts_table, workout_exercises_table.c.workout_id == workouts_table.c.hevy_workout_id  # Corrected join
-        ).where(
-            exercises_table.c.exercise_name.ilike(exercise),
-            workouts_table.c.start_time >= start_date,
-            workouts_table.c.start_time <= end_date
-        )
-        sets_in_range = db.execute(sets_query).fetchall()
-        print(f"Debug: Sets for '{exercise}' in Date Range ({start_date} to {end_date}) - {sets_in_range}")
-
-        # Query the 1RM (One-Rep Max) and the set details
+        # Fetch the highest calculated 1RM
         one_rm_query = query_get_one_rm_for_exercise(exercise, start_date, end_date)
-        print(f"Debug: Executing 1RM query for exercise '{exercise}' with date range {start_date} to {end_date}")
-        print(f"Debug: Query - {one_rm_query}")
         one_rm_result = db.execute(one_rm_query).fetchone()
-        print(f"Debug: 1RM Result for '{exercise}' - {one_rm_result}")
+        print(f"Debug: 1RM Query Result for '{exercise}': {one_rm_result}")  # Debug print
 
-        # Query the heaviest weight ever used and the set details
+        # Fetch the heaviest weight ever used
         heaviest_weight_query = query_get_heaviest_weight_for_exercise(exercise, start_date, end_date)
-        print(f"Debug: Executing heaviest weight query for exercise '{exercise}' with date range {start_date} to {end_date}")
-        print(f"Debug: Query - {heaviest_weight_query}")
         heaviest_weight_result = db.execute(heaviest_weight_query).fetchone()
-        print(f"Debug: Heaviest Weight Result for '{exercise}' - {heaviest_weight_result}")
+        print(f"Debug: Heaviest Weight Query Result for '{exercise}': {heaviest_weight_result}")  # Debug print
 
-        # Handle null results gracefully
+        # Extract details for the 1RM
         if one_rm_result:
-            one_rm_date, one_rm_weight_kg, one_rm_reps = one_rm_result
-            one_rm_weight = round(one_rm_weight_kg * 2.20462, 2)  # Convert to pounds
-            calculated_one_rm = round(one_rm_weight / (1.0278 - (0.0278 * one_rm_reps)), 2) if one_rm_reps > 0 else None
+            one_rm_date = one_rm_result.date.date() if one_rm_result.date else None
+            one_rm_weight = round(one_rm_result.weight * 2.20462, 1) if one_rm_result.weight else None  # Convert to pounds
+            one_rm_reps = one_rm_result.reps
+            calculated_one_rm = round(one_rm_result.calculated_1rm * 2.20462, 1) if one_rm_result.calculated_1rm else None  # Convert to pounds
         else:
             one_rm_date, one_rm_weight, one_rm_reps, calculated_one_rm = None, None, None, None
 
-        if heaviest_weight_result:
-            heaviest_weight_date, heaviest_weight_kg = heaviest_weight_result
-            heaviest_weight = round(heaviest_weight_kg * 2.20462, 2)  # Convert to pounds
+        # Extract details for the heaviest weight
+        if heaviest_weight_result and heaviest_weight_result.max_weight is not None:
+            max_weight = round(heaviest_weight_result.max_weight * 2.20462, 1)  # Convert to pounds
+            earliest_date = heaviest_weight_result.earliest_date.date() if heaviest_weight_result.earliest_date else None
         else:
-            heaviest_weight_date, heaviest_weight = None, None
+            max_weight, earliest_date = None, None
 
-        # Add debug logs for final record
-        print(f"Debug: Final Record for '{exercise}' - 1RM: {one_rm_weight} lbs, Heaviest: {heaviest_weight} lbs")
-
+        # Add record for the exercise
         records.append({
             "Exercise": exercise,
-            "1RM Weight (lbs)": one_rm_weight,
+            "Calculated 1RM (lbs)": f"{calculated_one_rm:.1f}" if calculated_one_rm else None,
+            "1RM Weight (lbs)": f"{one_rm_weight:.1f}" if one_rm_weight else None,
             "1RM Reps": one_rm_reps,
-            "Calculated 1RM (lbs)": calculated_one_rm,
             "1RM Date": one_rm_date,
-            "Heaviest Weight (lbs)": heaviest_weight,
-            "Heaviest Weight Date": heaviest_weight_date
+            "Max Weight (lbs)": f"{max_weight:.1f}" if max_weight else None,
+            "Max Weight Date": earliest_date
         })
+
+    # Debug: Print all records before creating the DataFrame
+    print(f"Debug: Records for 1RM Table: {records}")
 
     # Create a DataFrame for the records
     records_df = pd.DataFrame(records)
@@ -278,7 +254,7 @@ if page == "Workouts":
     if not records_df.empty:
         st.table(records_df)
     else:
-        st.info("No 1RM or heaviest weight data available for the selected exercises and date range.")
+        st.info("No 1RM data available for the selected exercises and date range.")
 
 elif page == "Nutrition":
     st.title("Protein Per Day")
