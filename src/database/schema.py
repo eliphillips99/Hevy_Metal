@@ -42,7 +42,7 @@ workout_exercises_table = Table('workout_exercises', metadata,
     Column('superset_id', Integer),
 )
 
-sets_table = Table('sets', metadata,
+sets = Table('sets', metadata,
     Column('set_id', Integer, primary_key=True),
     Column('exercise_id', Integer, ForeignKey('exercises.exercise_id'), nullable=False),
     Column('set_index', Integer, nullable=False),

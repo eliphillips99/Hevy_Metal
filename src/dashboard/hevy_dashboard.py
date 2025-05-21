@@ -61,7 +61,10 @@ from src.database.schema import (
     exercises_table,
     workouts_table,
     workout_exercises_table,
-    sets_table
+    sets,
+    sleep_data_table,
+    nutrition_data_table,
+    diet_cycles_table
 )
 
 # Create a database session
@@ -221,7 +224,7 @@ if page == "Workouts":
         if one_rm_result:
             one_rm_date = one_rm_result.date.date() if one_rm_result.date else None
             one_rm_weight = round(one_rm_result.weight * 2.20462, 1) if one_rm_result.weight else None  # Convert to pounds
-            one_rm_reps = one_rm_result.reps
+            one_rm_reps = int(round(float(one_rm_result.reps))) if one_rm_result.reps else None  # Ensure whole number
             calculated_one_rm = round(one_rm_result.calculated_1rm * 2.20462, 1) if one_rm_result.calculated_1rm else None  # Convert to pounds
         else:
             one_rm_date, one_rm_weight, one_rm_reps, calculated_one_rm = None, None, None, None
@@ -230,18 +233,20 @@ if page == "Workouts":
         if heaviest_weight_result and heaviest_weight_result.max_weight is not None:
             max_weight = round(heaviest_weight_result.max_weight * 2.20462, 1)  # Convert to pounds
             earliest_date = heaviest_weight_result.earliest_date.date() if heaviest_weight_result.earliest_date else None
+            max_reps = int(round(float(heaviest_weight_result.reps))) if heaviest_weight_result.reps else None  # Ensure whole number
         else:
-            max_weight, earliest_date = None, None
+            max_weight, earliest_date, max_reps = None, None, None
 
         # Add record for the exercise
         records.append({
             "Exercise": exercise,
             "Calculated 1RM (lbs)": f"{calculated_one_rm:.1f}" if calculated_one_rm else None,
             "1RM Weight (lbs)": f"{one_rm_weight:.1f}" if one_rm_weight else None,
-            "1RM Reps": one_rm_reps,
+            "1RM Reps": int(round(float(one_rm_reps))) if one_rm_reps else None,  # Ensure whole number
             "1RM Date": one_rm_date,
             "Max Weight (lbs)": f"{max_weight:.1f}" if max_weight else None,
-            "Max Weight Date": earliest_date
+            "Max Weight Reps": max_reps,  # Swap column location
+            "Max Weight Date": earliest_date  # Swap column location
         })
 
     # Debug: Print all records before creating the DataFrame
