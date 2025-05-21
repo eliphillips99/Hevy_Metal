@@ -12,9 +12,8 @@ common_data = Table('common_data', metadata,
 )
 
 workouts_table = Table('workouts', metadata,
+    Column('hevy_workout_id', String, primary_key=True, nullable=False),
     Column('common_data_id', Integer, ForeignKey('common_data.common_data_id'), nullable=False),
-    Column('workout_id', Integer, primary_key=True, autoincrement=True),
-    Column('hevy_workout_id', String, unique=True, nullable=False),
     Column('workout_name', String),
     Column('workout_description', String),
     Column('start_time', DateTime),
@@ -35,7 +34,7 @@ exercises_table = Table('exercises', metadata,
 )
 
 workout_exercises_table = Table('workout_exercises', metadata,
-    Column('workout_id', Integer, ForeignKey('workouts.workout_id'), nullable=False),
+    Column('hevy_workout_id', String, ForeignKey('workouts.hevy_workout_id'), nullable=False),
     Column('exercise_id', Integer, ForeignKey('exercises.exercise_id'), nullable=False),
     Column('exercise_index', Integer, nullable=False),
     Column('exercise_notes', String),

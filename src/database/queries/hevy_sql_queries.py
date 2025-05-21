@@ -26,7 +26,7 @@ def query_apply_date_filter(query, table, start_date=None, end_date=None, date_c
 def query_get_all_workouts(start_date=None, end_date=None):
     """Returns a query for all workouts, ordered by start time."""
     query = select(
-        workouts_table.c.workout_id,
+        workouts_table.c.hevy_workout_id.label("workout_id"),
         workouts_table.c.workout_name,
         workouts_table.c.start_time,
         workouts_table.c.end_time
@@ -40,7 +40,7 @@ def query_get_exercises_in_workout(workout_id):
         exercises_table.c.exercise_name
     ).\
         join(workout_exercises_table, exercises_table.c.exercise_id == workout_exercises_table.c.exercise_id).\
-        where(workout_exercises_table.c.workout_id == workout_id)
+        where(workout_exercises_table.c.hevy_workout_id == workout_id)
     
     return db.execute(query).fetchall()
 
@@ -53,7 +53,7 @@ def query_get_sets_for_exercise_in_workout(workout_id, exercise_name):
     ).\
         join(workout_exercises_table, sets.c.exercise_id == workout_exercises_table.c.exercise_id).\
         join(exercises_table, workout_exercises_table.c.exercise_id == exercises_table.c.exercise_id).\
-        where(and_(workout_exercises_table.c.workout_id == workout_id, exercises_table.c.exercise_name == exercise_name)).\
+        where(and_(workout_exercises_table.c.hevy_workout_id == workout_id, exercises_table.c.exercise_name == exercise_name)).\
         order_by(sets.c.set_index)
     
     return db.execute(query).fetchall()
@@ -71,7 +71,7 @@ def query_get_exercise_counts(start_date=None, end_date=None):
     ).join(
         workout_exercises_table, exercises_table.c.exercise_id == workout_exercises_table.c.exercise_id
     ).join(
-        workouts_table, workout_exercises_table.c.workout_id == workouts_table.c.workout_id
+        workouts_table, workout_exercises_table.c.hevy_workout_id == workouts_table.c.hevy_workout_id
     ).group_by(
         exercises_table.c.exercise_name
     ).order_by(
@@ -119,7 +119,7 @@ def query_get_primary_muscle_volume(muscle_name, start_date=None, end_date=None)
     ).\
         join(workout_exercises_table, sets.c.exercise_id == workout_exercises_table.c.exercise_id).\
         join(exercises_table, workout_exercises_table.c.exercise_id == exercises_table.c.exercise_id).\
-        join(workouts_table, workout_exercises_table.c.workout_id == workouts_table.c.hevy_workout_id)
+        join(workouts_table, workout_exercises_table.c.hevy_workout_id == workouts_table.c.hevy_workout_id)
 
     if conditions:
         query = query.where(and_(*conditions))
@@ -141,7 +141,7 @@ def query_get_secondary_muscle_volume(muscle_name, start_date=None, end_date=Non
     ).\
         join(workout_exercises_table, sets.c.exercise_id == workout_exercises_table.c.exercise_id).\
         join(exercises_table, workout_exercises_table.c.exercise_id == exercises_table.c.exercise_id).\
-        join(workouts_table, workout_exercises_table.c.workout_id == workouts_table.c.hevy_workout_id)
+        join(workouts_table, workout_exercises_table.c.hevy_workout_id == workouts_table.c.hevy_workout_id)
 
     if conditions:
         query = query.where(and_(*conditions))
@@ -167,7 +167,7 @@ def query_debug_sets_data():
     ).\
         join(exercises_table, sets.c.exercise_id == exercises_table.c.exercise_id, isouter=True).\
         join(workout_exercises_table, workout_exercises_table.c.exercise_id == exercises_table.c.exercise_id, isouter=True).\
-        join(workouts_table, workout_exercises_table.c.workout_id == workouts_table.c.workout_id, isouter=True)
+        join(workouts_table, workout_exercises_table.c.hevy_workout_id == workouts_table.c.hevy_workout_id, isouter=True)
     return query
 
 def query_debug_raw_sets_data():
@@ -195,7 +195,7 @@ def query_debug_exercises_data():
 def query_debug_workout_exercises_data():
     """Debug query to fetch all workout_exercises data."""
     query = select(
-        workout_exercises_table.c.workout_id,
+        workout_exercises_table.c.hevy_workout_id,
         workout_exercises_table.c.exercise_id,
         workout_exercises_table.c.exercise_index
     )
@@ -204,7 +204,7 @@ def query_debug_workout_exercises_data():
 def query_debug_workouts_data():
     """Debug query to fetch all workouts data."""
     query = select(
-        workouts_table.c.workout_id,
+        workouts_table.c.hevy_workout_id.label("workout_id"),
         workouts_table.c.workout_name,
         workouts_table.c.start_time,
         workouts_table.c.end_time
@@ -231,7 +231,7 @@ def query_debug_primary_muscle_matching(muscle_name):
     ).\
         join(exercises_table, sets.c.exercise_id == exercises_table.c.exercise_id).\
         join(workout_exercises_table, workout_exercises_table.c.exercise_id == exercises_table.c.exercise_id).\
-        join(workouts_table, workout_exercises_table.c.workout_id == workouts_table.c.workout_id).\
+        join(workouts_table, workout_exercises_table.c.hevy_workout_id == workouts_table.c.hevy_workout_id).\
         where(func.lower(func.trim(func.replace(exercises_table.c.primary_muscles, ',', ' '))).like(f"%{muscle_name.lower()}%"))
     return query
 
@@ -246,7 +246,7 @@ def query_debug_secondary_muscle_matching(muscle_name):
     ).\
         join(exercises_table, sets.c.exercise_id == exercises_table.c.exercise_id).\
         join(workout_exercises_table, workout_exercises_table.c.exercise_id == exercises_table.c.exercise_id).\
-        join(workouts_table, workout_exercises_table.c.workout_id == workouts_table.c.workout_id).\
+        join(workouts_table, workout_exercises_table.c.hevy_workout_id == workouts_table.c.hevy_workout_id).\
         where(func.lower(func.trim(func.replace(exercises_table.c.secondary_muscles, ',', ' '))).like(f"%{muscle_name.lower()}%"))
     return query
 
@@ -264,7 +264,7 @@ def query_debug_joined_sets_exercises_workouts():
     ).\
         join(exercises_table, sets.c.exercise_id == exercises_table.c.exercise_id, isouter=True).\
         join(workout_exercises_table, workout_exercises_table.c.exercise_id == exercises_table.c.exercise_id, isouter=True).\
-        join(workouts_table, workout_exercises_table.c.workout_id == workouts_table.c.hevy_workout_id, isouter=True)  # Correct join
+        join(workouts_table, workout_exercises_table.c.hevy_workout_id == workouts_table.c.hevy_workout_id, isouter=True)  # Correct join
     return query
 
 def query_debug_no_date_filter(muscle_name):
@@ -278,7 +278,7 @@ def query_debug_no_date_filter(muscle_name):
     ).\
         join(exercises_table, sets.c.exercise_id == exercises_table.c.exercise_id).\
         join(workout_exercises_table, workout_exercises_table.c.exercise_id == exercises_table.c.exercise_id).\
-        join(workouts_table, workout_exercises_table.c.workout_id == workouts_table.c.workout_id).\
+        join(workouts_table, workout_exercises_table.c.hevy_workout_id == workouts_table.c.hevy_workout_id).\
         where(func.lower(func.trim(func.replace(exercises_table.c.primary_muscles, ',', ' '))).like(f"%{muscle_name.lower()}%"))
     return query
 
@@ -306,7 +306,7 @@ def query_debug_all_exercises():
 def query_debug_all_workout_exercises():
     """Debug query to fetch all rows from the workout_exercises table."""
     query = select(
-        workout_exercises_table.c.workout_id,
+        workout_exercises_table.c.hevy_workout_id,
         workout_exercises_table.c.exercise_id,
         workout_exercises_table.c.exercise_index
     )
@@ -315,7 +315,7 @@ def query_debug_all_workout_exercises():
 def query_debug_all_workouts():
     """Debug query to fetch all rows from the workouts table."""
     query = select(
-        workouts_table.c.workout_id,
+        workouts_table.c.hevy_workout_id.label("workout_id"),
         workouts_table.c.workout_name,
         workouts_table.c.start_time,
         workouts_table.c.end_time
@@ -333,9 +333,9 @@ def query_debug_broken_relationships():
 def query_debug_broken_workout_relationships():
     """Debug query to find rows in workout_exercises without matching hevy_workout_id in workouts."""
     query = select(
-        workout_exercises_table.c.workout_id,
+        workout_exercises_table.c.hevy_workout_id,
         workout_exercises_table.c.exercise_id
-    ).where(~workout_exercises_table.c.workout_id.in_(select(workouts_table.c.hevy_workout_id)))  # Use hevy_workout_id
+    ).where(~workout_exercises_table.c.hevy_workout_id.in_(select(workouts_table.c.hevy_workout_id)))  # Use hevy_workout_id
     return query
 
 def query_debug_broken_set_relationships():
@@ -359,7 +359,7 @@ def query_debug_intermediate_results(muscle_name, start_date=None, end_date=None
     ).\
         join(exercises_table, sets.c.exercise_id == exercises_table.c.exercise_id).\
         join(workout_exercises_table, workout_exercises_table.c.exercise_id == exercises_table.c.exercise_id).\
-        join(workouts_table, workout_exercises_table.c.workout_id == workouts_table.c.hevy_workout_id).\
+        join(workouts_table, workout_exercises_table.c.hevy_workout_id == workouts_table.c.hevy_workout_id).\
         where(and_(
             func.lower(func.trim(func.replace(exercises_table.c.primary_muscles, ',', ' '))).like(f"%{muscle_name.lower()}%"),
             workouts_table.c.start_time >= start_date if start_date else True,
@@ -386,7 +386,7 @@ def query_get_one_rm_for_exercise(exercise_name, start_date=None, end_date=None)
     ).join(
         exercises_table, workout_exercises_table.c.exercise_id == exercises_table.c.exercise_id
     ).join(
-        workouts_table, workout_exercises_table.c.workout_id == workouts_table.c.hevy_workout_id
+        workouts_table, workout_exercises_table.c.hevy_workout_id == workouts_table.c.hevy_workout_id
     ).join(
         common_data, workouts_table.c.common_data_id == common_data.c.common_data_id  # Use common_data for date
     ).where(
@@ -420,7 +420,7 @@ def query_get_heaviest_weight_for_exercise(exercise_name, start_date=None, end_d
     ).join(
         exercises_table, workout_exercises_table.c.exercise_id == exercises_table.c.exercise_id
     ).join(
-        workouts_table, workout_exercises_table.c.workout_id == workouts_table.c.hevy_workout_id
+        workouts_table, workout_exercises_table.c.hevy_workout_id == workouts_table.c.hevy_workout_id
     ).join(
         common_data, workouts_table.c.common_data_id == common_data.c.common_data_id  # Use common_data for date
     ).where(
@@ -456,7 +456,7 @@ def query_debug_sets_with_exercise_and_workout_details():
     ).join(
         workout_exercises_table, exercises_table.c.exercise_id == workout_exercises_table.c.exercise_id  # Corrected join condition
     ).join(
-        workouts_table, workout_exercises_table.c.workout_id == workouts_table.c.hevy_workout_id  # Updated join condition
+        workouts_table, workout_exercises_table.c.hevy_workout_id == workouts_table.c.hevy_workout_id  # Updated join condition
     )
 
     # Debug: Log the generated SQL query
