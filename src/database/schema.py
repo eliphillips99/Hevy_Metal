@@ -20,6 +20,24 @@ workouts_table = Table('workouts', metadata,
     Column('end_time', DateTime),
     Column('created_at', DateTime),
     Column('updated_at', DateTime),
+    Column('pumps', String),  # JSON or text for muscle-specific ratings
+    Column('fatigue', String),  # JSON or text for pre/post/mental fatigue ratings
+    Column('notes', String),  # General notes about the workout
+    Column('listened_to', String)  # Music or audio listened to during the workout
+)
+
+pumps_table = Table('pumps', metadata,
+    Column('pump_id', Integer, primary_key=True, autoincrement=True),
+    Column('workout_id', String, ForeignKey('workouts.hevy_workout_id'), nullable=False),
+    Column('muscle_group', String, nullable=False),
+    Column('rating', Integer, nullable=False)
+)
+
+fatigue_table = Table('fatigue', metadata,
+    Column('fatigue_id', Integer, primary_key=True, autoincrement=True),
+    Column('workout_id', String, ForeignKey('workouts.hevy_workout_id'), nullable=False),
+    Column('fatigue_type', String, nullable=False),
+    Column('rating', Integer, nullable=False)
 )
 
 exercises_table = Table('exercises', metadata,

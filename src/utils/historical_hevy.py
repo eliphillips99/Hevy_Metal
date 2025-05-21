@@ -5,6 +5,7 @@ import json
 from datetime import datetime
 from dotenv import load_dotenv
 from database.database_utils import get_or_create_common_data_id
+import re
 
 load_dotenv()
 HEVY_API_KEY = os.getenv("HEVY_API_KEY")
@@ -63,6 +64,45 @@ def fetch_exercise_details(exercise_template_id):
     except requests.exceptions.RequestException as e:
         print(f"Error fetching exercise details for {exercise_template_id}: {e}")
         return None, None, None, None, None
+
+def parse_workout_description(description):
+    """Parses the workout description to extract pumps, fatigue, notes, and listened_to."""
+    pumps = []
+    fatigue = []
+    notes = None
+    listened_to = None
+
+    # Extract Pumps
+    pumps_match = re.search(r"Pumps\n- Scale:.*?\n(.*?)\n", description, re.DOTALL)
+    if pumps_match:
+        pumps_lines = pumps_match.group(1).split("\n")
+        for line in pumps_lines:
+            if ":" in line:
+                muscle_group, rating = line.split(":")
+                pumps.append({"muscle_group": muscle_group.strip(), "rating": rating.strip()})
+
+    # Extract Fatigue
+    fatigue_match = re.search(r"Fatigue\n- Scale:.*?\n(.*?)\n", description, re.DOTALL)
+    if fatigue_match:
+        fatigue_lines = fatigue_match.group(1).split("\n")
+        for line in fatigue_lines:
+            if ":" in line:
+                fatigue_type, rating = line.split(":")
+                fatigue.append({"fatigue_type": fatigue_type.strip(), "rating": rating.strip()})
+
+    # Extract What I Listened To
+    listened_to_match = re.search(r"What I Listened To\n- (.*?)\n", description)
+    if listened_to_match:
+        listened_to = listened_to_match.group(1).strip()
+
+    # Extract Notes
+    notes_match = re.search(r"Notes\n- (.*?)\n", description, re.DOTALL)
+    if notes_match:
+        notes = notes_match.group(1).strip()
+    else:
+        notes = description.strip()  # If no structured data, use the entire description
+
+    return pumps, fatigue, notes, listened_to
 
 def store_workouts_in_sqlite(workouts):
     """Stores Hevy workout data in the SQLite database using the updated schema."""
@@ -124,20 +164,50 @@ def store_workouts_in_sqlite(workouts):
         # Remove the redundant loop and ensure the logic is streamlined
         for workout in workouts:
             hevy_workout_id = workout.get("id")
+            description = workout.get("description", "")
+
+            # Parse the description
+            pumps, fatigue, notes, listened_to = parse_workout_description(description)
 
             # Insert into workouts
             try:
                 cursor.execute(
                     """
-                    INSERT OR IGNORE INTO workouts (common_data_id, hevy_workout_id, workout_name, workout_description, start_time, end_time, created_at, updated_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    INSERT OR IGNORE INTO workouts (common_data_id, hevy_workout_id, workout_name, workout_description, start_time, end_time, created_at, updated_at, notes, listened_to)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
-                    (common_data_id, hevy_workout_id, workout.get("title"), workout.get("description"),
-                     workout.get("start_time"), workout.get("end_time"), workout.get("created_at"), workout.get("updated_at"))
+                    (common_data_id, hevy_workout_id, workout.get("title"), description,
+                     workout.get("start_time"), workout.get("end_time"), workout.get("created_at"), workout.get("updated_at"), notes, listened_to)
                 )
             except sqlite3.IntegrityError as e:
                 print(f"Error inserting workout {hevy_workout_id}: {e}")
                 continue
+
+            # Insert pumps
+            for pump in pumps:
+                try:
+                    cursor.execute(
+                        """
+                        INSERT INTO pumps (workout_id, muscle_group, rating)
+                        VALUES (?, ?, ?)
+                        """,
+                        (hevy_workout_id, pump["muscle_group"], pump["rating"])
+                    )
+                except sqlite3.IntegrityError as e:
+                    print(f"Error inserting pump for workout {hevy_workout_id}: {e}")
+
+            # Insert fatigue
+            for fatigue_entry in fatigue:
+                try:
+                    cursor.execute(
+                        """
+                        INSERT INTO fatigue (workout_id, fatigue_type, rating)
+                        VALUES (?, ?, ?)
+                        """,
+                        (hevy_workout_id, fatigue_entry["fatigue_type"], fatigue_entry["rating"])
+                    )
+                except sqlite3.IntegrityError as e:
+                    print(f"Error inserting fatigue for workout {hevy_workout_id}: {e}")
 
             # Process exercises
             for exercise_data in workout.get("exercises", []):
