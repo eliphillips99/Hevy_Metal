@@ -33,7 +33,9 @@ exercises_table = Table('exercises', metadata,
     Column('type', String)  # New column for the type of exercise
 )
 
+# Ensure workout_exercises table has a primary key for linking
 workout_exercises_table = Table('workout_exercises', metadata,
+    Column('workout_exercise_id', Integer, primary_key=True, autoincrement=True),
     Column('hevy_workout_id', String, ForeignKey('workouts.hevy_workout_id'), nullable=False),
     Column('exercise_id', Integer, ForeignKey('exercises.exercise_id'), nullable=False),
     Column('exercise_index', Integer, nullable=False),
@@ -41,9 +43,10 @@ workout_exercises_table = Table('workout_exercises', metadata,
     Column('superset_id', Integer),
 )
 
+# Update the sets table to link to workout_exercises instead of exercises
 sets = Table('sets', metadata,
     Column('set_id', Integer, primary_key=True),
-    Column('exercise_id', Integer, ForeignKey('exercises.exercise_id'), nullable=False),
+    Column('workout_exercise_id', Integer, ForeignKey('workout_exercises.workout_exercise_id'), nullable=False),
     Column('set_index', Integer, nullable=False),
     Column('set_type', String),
     Column('weight_kg', Float),
@@ -51,7 +54,7 @@ sets = Table('sets', metadata,
     Column('duration_seconds', Float),
     Column('rpe', Float),
     Column('custom_metric', String),
-    UniqueConstraint('exercise_id', 'set_index', 'set_type', 'weight_kg', 'reps', 'duration_seconds', 'rpe', 'custom_metric', name='uq_sets')
+    UniqueConstraint('workout_exercise_id', 'set_index', 'set_type', 'weight_kg', 'reps', 'duration_seconds', 'rpe', 'custom_metric', name='uq_sets')
 )
 
 metrics = Table('metrics', metadata,

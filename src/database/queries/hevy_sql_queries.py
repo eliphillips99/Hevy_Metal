@@ -323,27 +323,25 @@ def query_debug_all_workouts():
     return query
 
 def query_debug_broken_relationships():
-    """Debug query to find rows with broken relationships between sets and exercises."""
+    """Debug query to find rows with broken relationships between sets and workout_exercises."""
     query = select(
         sets.c.set_id,
-        sets.c.exercise_id
-    ).where(~sets.c.exercise_id.in_(select(exercises_table.c.exercise_id)))
-    return query
-
-def query_debug_broken_workout_relationships():
-    """Debug query to find rows in workout_exercises without matching hevy_workout_id in workouts."""
-    query = select(
-        workout_exercises_table.c.hevy_workout_id,
-        workout_exercises_table.c.exercise_id
-    ).where(~workout_exercises_table.c.hevy_workout_id.in_(select(workouts_table.c.hevy_workout_id)))  # Use hevy_workout_id
+        sets.c.workout_exercise_id
+    ).where(~sets.c.workout_exercise_id.in_(select(workout_exercises_table.c.workout_exercise_id)))
     return query
 
 def query_debug_broken_set_relationships():
-    """Debug query to find rows in sets without matching exercise_id in exercises."""
+    """Debug query to find rows in workout_exercises without matching workout or exercise."""
     query = select(
-        sets.c.set_id,
-        sets.c.exercise_id
-    ).where(~sets.c.exercise_id.in_(select(exercises_table.c.exercise_id)))
+        workout_exercises_table.c.workout_exercise_id,
+        workout_exercises_table.c.hevy_workout_id,
+        workout_exercises_table.c.exercise_id
+    ).where(
+        or_(
+            ~workout_exercises_table.c.hevy_workout_id.in_(select(workouts_table.c.hevy_workout_id)),
+            ~workout_exercises_table.c.exercise_id.in_(select(exercises_table.c.exercise_id))
+        )
+    )
     return query
 
 def query_debug_intermediate_results(muscle_name, start_date=None, end_date=None):
