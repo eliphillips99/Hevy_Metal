@@ -20,8 +20,6 @@ workouts_table = Table('workouts', metadata,
     Column('end_time', DateTime),
     Column('created_at', DateTime),
     Column('updated_at', DateTime),
-    Column('pumps', String),  # JSON or text for muscle-specific ratings
-    Column('fatigue', String),  # JSON or text for pre/post/mental fatigue ratings
     Column('notes', String),  # General notes about the workout
     Column('listened_to', String)  # Music or audio listened to during the workout
 )

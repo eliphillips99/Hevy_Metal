@@ -11,6 +11,7 @@ from utils.historical_hevy import main as populate_hevy_data
 from utils.historical_health import import_historical_data
 from utils.historical_diet import import_diet_cycles_from_csv, import_diet_weeks_from_csv
 from src.database.schema import metadata
+from utils.historical_hevy import fetch_all_hevy_workouts
 
 DATABASE_NAME = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../data/hevy_metal.db"))
 HEALTH_JSON_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../data/HealthAutoExport-2023-06-17-2025-04-26.json"))
@@ -74,3 +75,13 @@ if __name__ == "__main__":
 
     # Refresh the database with data
     # refresh_database()
+
+# Add logging to verify progress during Hevy data population
+from utils.historical_hevy import store_workouts_in_sqlite
+
+def populate_hevy_data():
+    print("Starting Hevy data population...")  # Log start
+    workouts = fetch_all_hevy_workouts()
+    print(f"Fetched {len(workouts)} workouts.")  # Log number of workouts fetched
+    store_workouts_in_sqlite(workouts)
+    print("Hevy data population complete.")  # Log completion
