@@ -5,6 +5,7 @@ import json
 from datetime import datetime
 from dotenv import load_dotenv
 from database.database_utils import get_or_create_common_data_id
+import re
 
 load_dotenv()
 HEVY_API_KEY = os.getenv("HEVY_API_KEY")
@@ -38,8 +39,12 @@ def fetch_all_hevy_workouts():
             print(f"Error fetching data from Hevy API: {e}")
             break
 
+    print(f"Fetched {len(all_workouts)} workouts from the API.")  # Debug log
+
     # Deduplicate workouts by ID
     unique_workouts = {workout["id"]: workout for workout in all_workouts}.values()
+    print(f"Deduplicated to {len(unique_workouts)} unique workouts.")  # Debug log
+
     return list(unique_workouts)
 
 def fetch_exercise_details(exercise_template_id):
@@ -80,7 +85,8 @@ def store_workouts_in_sqlite(workouts):
         # Check if the workout already exists in the database
         cursor.execute("SELECT COUNT(*) FROM workouts WHERE hevy_workout_id = ?", (hevy_workout_id,))
         if cursor.fetchone()[0] > 0:
-            print(f"Skipping duplicate workout {hevy_workout_id}.")
+            # Commented out the debug line about skipping duplicate workouts
+            # print(f"Skipping duplicate workout {hevy_workout_id}.")
             continue
 
         if not isinstance(workout, dict):
@@ -110,16 +116,69 @@ def store_workouts_in_sqlite(workouts):
         #print(f"Inserting workout: {hevy_workout_id, workout_name, start_time, end_time}")
 
         try:
-            cursor.execute("""
-                INSERT INTO workouts (common_data_id, hevy_workout_id, workout_name, workout_description, start_time, end_time, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """, (common_data_id, hevy_workout_id, workout_name, workout_description, start_time, end_time, created_at, updated_at))
+            cursor.execute(
+                """
+                INSERT INTO workouts (common_data_id, hevy_workout_id, workout_name, workout_description, start_time, end_time, created_at, updated_at, listened_to, notes)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (common_data_id, hevy_workout_id, workout_name, workout_description, start_time, end_time, created_at, updated_at, listened_to, notes)
+            )
         except sqlite3.IntegrityError as e:
             print(f"Error inserting workout {hevy_workout_id}: {e}")
             continue
         except sqlite3.OperationalError as e:
             print(f"Operational error inserting workout {hevy_workout_id}: {e}")
             continue
+
+        # Parse workout description for pumps, fatigue, notes, and listened_to
+        pumps, fatigue, notes, listened_to = parse_workout_description(workout.get("description", ""))
+
+        # Ensure pumps data is appended correctly for all workouts
+        pumps = []  # Initialize pumps list outside the loop
+
+        # Add detailed debug logs for all extracted data
+        print(f"Debug: Pumps extracted - {pumps}")
+        print(f"Debug: Fatigue extracted - {fatigue}")
+        print(f"Debug: Notes extracted - {notes}")
+        print(f"Debug: What I Listened To extracted - {listened_to}")
+
+        # Insert pumps
+        for pump in pumps:
+            try:
+                cursor.execute(
+                    """
+                    INSERT INTO pumps (workout_id, muscle_group, rating)
+                    VALUES (?, ?, ?)
+                    """,
+                    (hevy_workout_id, pump["muscle_group"], pump["rating"])
+                )
+                print(f"Inserted pump: {pump} for workout {hevy_workout_id}")  # Debug log
+            except sqlite3.IntegrityError as e:
+                print(f"Error inserting pump for workout {hevy_workout_id}: {e}")
+
+        # Insert fatigue
+        for fatigue_entry in fatigue:
+            try:
+                cursor.execute(
+                    """
+                    INSERT INTO fatigue (workout_id, fatigue_type, rating)
+                    VALUES (?, ?, ?)
+                    """,
+                    (hevy_workout_id, fatigue_entry["fatigue_type"], fatigue_entry["rating"])
+                )
+                print(f"Inserted fatigue: {fatigue_entry} for workout {hevy_workout_id}")  # Debug log
+            except sqlite3.IntegrityError as e:
+                print(f"Error inserting fatigue for workout {hevy_workout_id}: {e}")
+
+        # Cache exercise details to minimize redundant API calls
+        exercise_details_cache = {}
+
+        def fetch_exercise_details_cached(exercise_template_id):
+            if exercise_template_id in exercise_details_cache:
+                return exercise_details_cache[exercise_template_id]
+            details = fetch_exercise_details(exercise_template_id)
+            exercise_details_cache[exercise_template_id] = details
+            return details
 
         # Remove the redundant loop and ensure the logic is streamlined
         for workout in workouts:
@@ -142,6 +201,7 @@ def store_workouts_in_sqlite(workouts):
             # Process exercises
             for exercise_data in workout.get("exercises", []):
                 exercise_template_id = exercise_data.get("exercise_template_id")
+                primary_muscles, secondary_muscles, equipment, is_custom, exercise_type = fetch_exercise_details_cached(exercise_template_id)
 
                 # Insert into exercises
                 try:
@@ -150,11 +210,10 @@ def store_workouts_in_sqlite(workouts):
                         INSERT OR IGNORE INTO exercises (hevy_exercise_template_id, exercise_name, primary_muscles, secondary_muscles, equipment, is_custom, type)
                         VALUES (?, ?, ?, ?, ?, ?, ?)
                         """,
-                        (exercise_template_id, exercise_data.get("title"), None, None, None, 0, None)
+                        (exercise_template_id, exercise_data.get("title"), primary_muscles, secondary_muscles, equipment, is_custom, exercise_type)
                     )
                 except sqlite3.IntegrityError as e:
                     print(f"Error inserting exercise {exercise_template_id}: {e}")
-                    continue
 
                 # Get exercise_id
                 cursor.execute("SELECT exercise_id FROM exercises WHERE hevy_exercise_template_id = ?", (exercise_template_id,))
@@ -193,6 +252,71 @@ def store_workouts_in_sqlite(workouts):
     conn.close()
     print(f"Successfully stored {len(workouts)} workouts in {DATABASE_NAME}.")
 
+def parse_workout_description(description):
+    """Parses the workout description to extract pumps, fatigue, notes, and listened_to."""
+    pumps = []
+    fatigue = []
+    notes = None
+    listened_to = None
+
+    # Define rating scales
+    rating_scale = {
+        "Poor": 1,
+        "Fair": 2,
+        "Good": 3,
+        "Great": 4,
+        "Dead": 1,
+        "Tired": 2,
+        "Fresh": 3,
+        "Hyped": 4
+    }
+
+    print(f"Parsing description: {description}")  # Debug log
+
+    # Extract Pumps
+    pumps_match = re.search(r"Pumps\n- Scale:.*?\n(.*?)\n", description, re.DOTALL)
+    if pumps_match:
+        print(f"Debug: Raw pumps data - {pumps_match.group(1)}")  # Debug log
+        pumps_lines = pumps_match.group(1).split(",")
+        for line in pumps_lines:
+            if ":" in line:
+                muscle_group, rating = line.split(":", 1)  # Split only on the first colon
+                muscle_group = muscle_group.strip("- ").strip()
+                rating = rating.strip()
+                numeric_rating = rating_scale.get(rating, int(rating) if rating.isdigit() else None)
+                if numeric_rating is not None:
+                    pumps.append({"muscle_group": muscle_group, "rating": numeric_rating})
+                    print(f"Debug: Parsed pump entry - {{'muscle_group': muscle_group, 'rating': numeric_rating}}")
+
+    # Extract Fatigue
+    fatigue_match = re.search(r"Fatigue\n- Scale:.*?\n((?:- .*?: .*?\n)+)", description, re.DOTALL)
+    if fatigue_match:
+        print(f"Debug: Raw fatigue data - {fatigue_match.group(1)}")  # Debug log
+        fatigue_lines = fatigue_match.group(1).strip().split("\n")
+        for line in fatigue_lines:
+            if ":" in line:
+                fatigue_type, rating = line.split(":", 1)  # Split only on the first colon
+                fatigue_type = fatigue_type.strip("- ").strip()
+                rating = rating.strip()
+                numeric_rating = rating_scale.get(rating, int(rating) if rating.isdigit() else None)
+                if numeric_rating is not None:
+                    fatigue.append({"fatigue_type": fatigue_type, "rating": numeric_rating})
+                    print(f"Debug: Parsed fatigue entry - {{'fatigue_type': fatigue_type, 'rating': numeric_rating}}")
+
+    # Extract What I Listened To
+    listened_to_match = re.search(r"What I Listened To\n- (.*?)\n", description)
+    if listened_to_match:
+        listened_to = listened_to_match.group(1).strip()
+
+    # Extract Notes
+    notes_match = re.search(r"Notes\n- (.*?)\n", description, re.DOTALL)
+    if notes_match:
+        notes = notes_match.group(1).strip()
+        print(f"Debug: Notes extracted - {notes}")
+    else:
+        notes = description.strip()  # If no structured data, use the entire description
+
+    return pumps, fatigue, notes, listened_to
 
 def main():
     # Fetch all workouts from Hevy API

@@ -29,7 +29,9 @@ def query_get_all_workouts(start_date=None, end_date=None):
         workouts_table.c.hevy_workout_id.label("workout_id"),
         workouts_table.c.workout_name,
         workouts_table.c.start_time,
-        workouts_table.c.end_time
+        workouts_table.c.end_time,
+        workouts_table.c.listened_to,
+        workouts_table.c.notes
     ).order_by(workouts_table.c.start_time.desc())
 
     query = apply_date_filter(query, workouts_table, start_date, end_date, date_column='start_time')

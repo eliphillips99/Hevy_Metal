@@ -20,6 +20,8 @@ workouts_table = Table('workouts', metadata,
     Column('end_time', DateTime),
     Column('created_at', DateTime),
     Column('updated_at', DateTime),
+    Column('listened_to', String),  # New column for what was listened to during the workout
+    Column('notes', String),  # New column for additional notes
 )
 
 exercises_table = Table('exercises', metadata,
@@ -157,6 +159,22 @@ data_table = Table(
     Column('data_json', String), # to store the raw data
     Column('created_at', DateTime),
     Column('updated_at', DateTime)
+)
+
+# Add pumps table
+define_pumps_table = Table('pumps', metadata,
+    Column('pump_id', Integer, primary_key=True, autoincrement=True),
+    Column('workout_id', String, ForeignKey('workouts.hevy_workout_id'), nullable=False),
+    Column('muscle_group', String, nullable=False),
+    Column('rating', Integer, nullable=False)
+)
+
+# Add fatigue table
+define_fatigue_table = Table('fatigue', metadata,
+    Column('fatigue_id', Integer, primary_key=True, autoincrement=True),
+    Column('workout_id', String, ForeignKey('workouts.hevy_workout_id'), nullable=False),
+    Column('fatigue_type', String, nullable=False),
+    Column('rating', Integer, nullable=False)
 )
 
 # Recreate the database schema

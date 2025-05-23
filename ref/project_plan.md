@@ -91,3 +91,60 @@ The Hevy Metal project is a comprehensive health and fitness tracking system tha
 3. SQLAlchemy queries for retrieving and aggregating data.
 4. Streamlit dashboard for data visualization and user interaction.
 5. Comprehensive documentation and user guide.
+
+### Summary of Changes to Reimplement
+
+#### 1. Schema Adjustments
+- **workout_exercises Table**:
+  - Ensure the table includes the following columns:
+    - `workout_exercise_id` (Primary Key, Integer, Auto-increment)
+    - `hevy_workout_id` (Foreign Key referencing `workouts.hevy_workout_id`)
+    - `exercise_id` (Foreign Key referencing `exercises.exercise_id`)
+    - `exercise_index` (Integer, Nullable)
+    - `exercise_notes` (String, Nullable)
+    - `superset_id` (Integer, Nullable)
+
+- **sets Table**:
+  - Ensure the table uses `workout_exercise_id` (Foreign Key referencing `workout_exercises.workout_exercise_id`) instead of `workout_id`.
+
+#### 2. Data Insertion Logic
+- **`store_workouts_in_sqlite` Function**:
+  - Insert data into the `workouts`, `pumps`, `fatigue`, `exercises`, `workout_exercises`, and `sets` tables.
+  - Use `hevy_workout_id` as the primary identifier for workouts.
+  - Ensure `workout_exercise_id` is retrieved from the `workout_exercises` table before inserting data into the `sets` table.
+  - Parse workout descriptions to extract `pumps`, `fatigue`, `notes`, and `listened_to` using the `parse_workout_description` function.
+
+#### 3. Parsing Enhancements
+- **`parse_workout_description` Function**:
+  - Extract `pumps` and `fatigue` ratings from structured text in workout descriptions.
+  - Normalize ratings using a predefined scale (e.g., `Poor` = 1, `Fair` = 2, etc.).
+  - Handle unstructured notes and audio data (e.g., `What I Listened To`).
+
+#### 4. API Integration
+- **`fetch_exercise_details` Function**:
+  - Cache exercise details to minimize redundant API calls.
+  - Extract and store primary/secondary muscles, equipment, custom flags, and exercise types.
+
+#### 5. Performance Improvements
+- Use `time.perf_counter()` for accurate timing in `store_workouts_in_sqlite`.
+- Deduplicate workouts in `fetch_all_hevy_workouts` by using a dictionary keyed by `workout_id`.
+
+#### 6. Error Handling and Logging
+- Add error handling for database insertions (e.g., `sqlite3.IntegrityError`).
+- Log successful insertions and errors for debugging purposes.
+
+#### 7. General Methodology
+- Ensure all foreign key relationships are respected (e.g., `hevy_workout_id`, `workout_exercise_id`).
+- Use `get_or_create_common_data_id` to manage `common_data` entries.
+- Validate and format timestamps (e.g., `start_time`, `created_at`) before database insertion.
+
+#### 8. Testing and Validation
+- Verify that all tables (`workouts`, `pumps`, `fatigue`, `exercises`, `workout_exercises`, `sets`) are populated correctly.
+- Test with a variety of workout data to ensure parsing and insertion logic handles edge cases.
+
+### Instructions for Reimplementation
+1. Revert to the previous commit to restore the original `store_workouts_in_sqlite` function and related logic.
+2. Apply the schema adjustments listed above.
+3. Update the `store_workouts_in_sqlite` function to include the enhanced data insertion logic.
+4. Test the changes thoroughly to ensure all tables are populated as expected.
+5. Log any errors or issues encountered during testing for further debugging.

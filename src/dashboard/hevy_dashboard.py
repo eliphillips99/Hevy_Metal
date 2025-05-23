@@ -124,7 +124,7 @@ if page == "Workouts":
     st.title("Workout Counts")
     workouts = query_get_all_workouts(start_date=start_date, end_date=end_date)
     if workouts:
-        df_workouts = pd.DataFrame(workouts, columns=["Workout ID", "Title", "Start Time", "End Time"])
+        df_workouts = pd.DataFrame(workouts, columns=["Workout ID", "Title", "Start Time", "End Time", "Listened To", "Notes"])
         st.dataframe(df_workouts)
     else:
         st.info("No workouts found for the selected date range.")
