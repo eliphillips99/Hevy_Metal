@@ -131,24 +131,6 @@ if page == "Workouts":
 
     st.title("Muscle Group Volume")
 
-    # Debug: Fetch all rows from sets_table with related exercise and workout details
-    debug_sets_query = query_debug_sets_with_exercise_and_workout_details()
-    debug_sets_result = db.execute(debug_sets_query).fetchall()
-    print(f"Debug: Sets with Related Exercise and Workout Details - {debug_sets_result}")
-
-    # Debug: Fetch all unique exercise names
-    unique_exercises_query = select(exercises_table.c.exercise_name).distinct()
-    unique_exercises = db.execute(unique_exercises_query).fetchall()
-    print(f"Debug: Unique Exercises in Database - {[row[0] for row in unique_exercises]}")
-
-    # Debug: Fetch all workouts in the selected date range
-    workouts_query = select(workouts_table.c.start_time, workouts_table.c.workout_name).where(
-        workouts_table.c.start_time >= start_date,
-        workouts_table.c.start_time <= end_date
-    )
-    workouts_in_range = db.execute(workouts_query).fetchall()
-    print(f"Debug: Workouts in Date Range ({start_date} to {end_date}) - {workouts_in_range}")
-
     # Fetch all unique muscle groups from the database
     all_muscle_groups_query = query_get_all_unique_muscle_groups(start_date, end_date)
     all_muscle_groups = [row[0] for row in db.execute(all_muscle_groups_query).fetchall() if row[0]]
@@ -174,9 +156,6 @@ if page == "Workouts":
 
             primary_volume = db.execute(primary_volume_query).scalar() or 0
             secondary_volume = db.execute(secondary_volume_query).scalar() or 0
-
-            # Debugging: Log the fetched volumes
-            print(f"Debug: Muscle '{muscle_name}', Primary Volume: {primary_volume}, Secondary Volume: {secondary_volume}")
 
             # Append data only if volumes are non-zero
             if primary_volume > 0 or secondary_volume > 0:
@@ -213,11 +192,9 @@ if page == "Workouts":
     for exercise in key_exercises:
         one_rm_query = query_get_one_rm_for_exercise(exercise, start_date, end_date)
         one_rm_result = db.execute(one_rm_query).fetchone()
-        print(f"Debug: Raw 1RM Query Result for '{exercise}': {one_rm_result}")  # Debug print
 
         heaviest_weight_query = query_get_heaviest_weight_for_exercise(exercise, start_date, end_date)
         heaviest_weight_result = db.execute(heaviest_weight_query).fetchone()
-        print(f"Debug: Raw Heaviest Weight Query Result for '{exercise}': {heaviest_weight_result}")  # Debug print
 
         # Extract details for the 1RM
         if one_rm_result:
@@ -248,9 +225,6 @@ if page == "Workouts":
             "Max Weight Date": earliest_date
         })
 
-    # Debug: Print all records before creating the DataFrame
-    print(f"Debug: Records for 1RM Table: {records}")
-
     # Create a DataFrame for the records
     records_df = pd.DataFrame(records)
 
@@ -259,6 +233,10 @@ if page == "Workouts":
         st.table(records_df)
     else:
         st.info("No 1RM data available for the selected exercises and date range.")
+
+    # Debug the volume distribution data
+    if volume_data:
+        debug_volume_distribution(volume_data)
 
 elif page == "Nutrition":
     st.title("Protein Per Day")
@@ -582,3 +560,40 @@ elif page == "Data Input":
                 st.error("No ongoing diet cycle found. Please start a new cycle first.")
 
 db.close()
+
+def debug_volume_distribution(volume_data):
+    """
+    Prints the volume distribution data for muscle groups in a format
+    that is easily copiable into the chat.
+
+    :param volume_data: A list of dictionaries containing muscle group volume data.
+    """
+    print("Volume Distribution Data:")
+    print("[")
+    for entry in volume_data:
+        print("    {", end="")
+        print(", ".join(f"'{key}': {repr(value)}" for key, value in entry.items()), end="")
+        print("},")
+    print("]")
+
+# Ensure the debug_volume_distribution function is defined before usage
+def debug_dashboard_values(muscle_group_volumes):
+    """
+    Prints the dashboard values for muscle group volumes in a format
+    that is easily copiable into the chat.
+
+    :param muscle_group_volumes: A dictionary where keys are muscle groups
+                                 and values are dictionaries of time periods
+                                 and their respective volumes.
+    """
+    print("Dashboard Values:")
+    print("{")
+    for muscle_group, periods in muscle_group_volumes.items():
+        print(f"    '{muscle_group}': {{")
+        for period, volume in periods.items():
+            print(f"        '{period}': {volume},")
+        print("    },")
+    print("}")
+
+# Initialize volume_data to avoid NameError
+volume_data = []

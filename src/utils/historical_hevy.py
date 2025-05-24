@@ -205,18 +205,17 @@ def store_workouts_in_sqlite(workouts):
         for exercise_data in workout.get("exercises", []):
             exercise_template_id = exercise_data.get("exercise_template_id")
 
-            # Insert into exercises
-            try:
-                cursor.execute(
-                    """
-                    INSERT OR IGNORE INTO exercises (hevy_exercise_template_id, exercise_name, primary_muscles, secondary_muscles, equipment, is_custom, type)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (exercise_template_id, exercise_data.get("title"), None, None, None, 0, None)
-                )
-            except sqlite3.IntegrityError as e:
-                print(f"Error inserting exercise {exercise_template_id}: {e}")
-                continue
+            # Fetch exercise details
+            primary_muscles, secondary_muscles, equipment, is_custom, exercise_type = fetch_exercise_details(exercise_template_id)
+
+            # Insert exercise details into the database
+            cursor.execute(
+                """
+                INSERT OR IGNORE INTO exercises (hevy_exercise_template_id, exercise_name, primary_muscles, secondary_muscles, equipment, is_custom, type)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (exercise_template_id, exercise_data.get("title"), primary_muscles, secondary_muscles, equipment, is_custom, exercise_type)
+            )
 
             # Get exercise_id
             cursor.execute("SELECT exercise_id FROM exercises WHERE hevy_exercise_template_id = ?", (exercise_template_id,))

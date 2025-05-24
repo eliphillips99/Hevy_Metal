@@ -120,7 +120,7 @@ def query_get_primary_muscle_volume(muscle_name, start_date=None, end_date=None)
     query = select(
         func.sum((func.coalesce(sets.c.weight_kg, 0) * func.coalesce(sets.c.reps, 0))).label('volume')
     ).\
-        join(workout_exercises_table, sets.c.exercise_id == workout_exercises_table.c.exercise_id).\
+        join(workout_exercises_table, sets.c.workout_exercise_id == workout_exercises_table.c.workout_exercise_id).\
         join(exercises_table, workout_exercises_table.c.exercise_id == exercises_table.c.exercise_id).\
         join(workouts_table, workout_exercises_table.c.hevy_workout_id == workouts_table.c.hevy_workout_id)
 
@@ -142,7 +142,7 @@ def query_get_secondary_muscle_volume(muscle_name, start_date=None, end_date=Non
     query = select(
         func.sum((func.coalesce(sets.c.weight_kg, 0) * func.coalesce(sets.c.reps, 0))).label('volume')
     ).\
-        join(workout_exercises_table, sets.c.exercise_id == workout_exercises_table.c.exercise_id).\
+        join(workout_exercises_table, sets.c.workout_exercise_id == workout_exercises_table.c.workout_exercise_id).\
         join(exercises_table, workout_exercises_table.c.exercise_id == exercises_table.c.exercise_id).\
         join(workouts_table, workout_exercises_table.c.hevy_workout_id == workouts_table.c.hevy_workout_id)
 
