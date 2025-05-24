@@ -154,22 +154,17 @@ def store_workouts_in_sqlite(workouts):
     conn = sqlite3.connect(DATABASE_NAME)
     cursor = conn.cursor()
 
-    processed_workouts = set()  # Track processed workout IDs in memory
-    start_time = time.perf_counter()  # Use perf_counter for timing
+    process_start_time = time.perf_counter()  # Use a unique variable name for tracking elapsed time
 
     for workout in workouts:
         hevy_workout_id = workout.get("id")
 
-        if hevy_workout_id in processed_workouts:
-            continue
-
         # Check if the workout already exists in the database
         cursor.execute("SELECT COUNT(*) FROM workouts WHERE hevy_workout_id = ?", (hevy_workout_id,))
         if cursor.fetchone()[0] > 0:
-            processed_workouts.add(hevy_workout_id)
+            print(f"Skipping duplicate workout {hevy_workout_id}.")
             continue
 
-<<<<<<< HEAD
         if not isinstance(workout, dict):
             print(f"Skipping invalid workout data: {workout}")
             continue
@@ -194,40 +189,18 @@ def store_workouts_in_sqlite(workouts):
         created_at = datetime.fromisoformat(workout.get("created_at").replace("Z", "+00:00")) if workout.get("created_at") else None
         updated_at = datetime.fromisoformat(workout.get("updated_at").replace("Z", "+00:00")) if workout.get("updated_at") else None
 
-=======
-        # Use start_time or created_at as the timestamp, fallback to current datetime
-        raw_timestamp = workout.get("start_time") or workout.get("created_at")
-        try:
-            timestamp = datetime.strptime(raw_timestamp, "%Y-%m-%dT%H:%M:%S") if raw_timestamp else datetime.now()
-        except ValueError:
-            timestamp = datetime.now()
-
-        # Generate or fetch common_data_id
-        common_data_id = get_or_create_common_data_id(cursor, timestamp, "Hevy API")
-
-        # Insert into workouts
->>>>>>> 90f275611fd18d1df5a84f49cb1ad7c12b1135ab
         try:
             cursor.execute(
                 """
                 INSERT INTO workouts (common_data_id, hevy_workout_id, workout_name, workout_description, start_time, end_time, created_at, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-<<<<<<< HEAD
                 (common_data_id, hevy_workout_id, workout_name, workout_description, start_time, end_time, created_at, updated_at)
             )
-=======
-                (common_data_id, hevy_workout_id, workout.get("title"), workout.get("description"),
-                 workout.get("start_time"), workout.get("end_time"), workout.get("created_at"), workout.get("updated_at"))
-            )
-            processed_workouts.add(hevy_workout_id)
-            print(f"Inserted workout: {hevy_workout_id}")  # Log successful insertion
->>>>>>> 90f275611fd18d1df5a84f49cb1ad7c12b1135ab
         except sqlite3.IntegrityError as e:
             print(f"Error inserting workout {hevy_workout_id}: {e}")
             continue
 
-<<<<<<< HEAD
         # Process exercises
         for exercise_data in workout.get("exercises", []):
             exercise_template_id = exercise_data.get("exercise_template_id")
@@ -263,76 +236,11 @@ def store_workouts_in_sqlite(workouts):
                 print(f"Error inserting workout_exercise for workout {hevy_workout_id}: {e}")
                 continue
 
-=======
-        # Parse workout description for pumps, fatigue, notes, and listened_to
-        pumps, fatigue, notes, listened_to = parse_workout_description(workout.get("description", ""))
-
-        # Insert pumps
-        for pump in pumps:
-            try:
-                cursor.execute(
-                    """
-                    INSERT INTO pumps (workout_id, muscle_group, rating)
-                    VALUES (?, ?, ?)
-                    """,
-                    (hevy_workout_id, pump["muscle_group"], pump["rating"])
-                )
-            except sqlite3.IntegrityError as e:
-                print(f"Error inserting pump for workout {hevy_workout_id}: {e}")
-
-        # Insert fatigue
-        for fatigue_entry in fatigue:
-            try:
-                cursor.execute(
-                    """
-                    INSERT INTO fatigue (workout_id, fatigue_type, rating)
-                    VALUES (?, ?, ?)
-                    """,
-                    (hevy_workout_id, fatigue_entry["fatigue_type"], fatigue_entry["rating"])
-                )
-            except sqlite3.IntegrityError as e:
-                print(f"Error inserting fatigue for workout {hevy_workout_id}: {e}")
-
-        # Process exercises
-        for exercise_data in workout.get("exercises", []):
-            hevy_exercise_template_id = exercise_data.get("exercise_template_id")
-
-            # Fetch exercise details
-            primary_muscles, secondary_muscles, equipment, is_custom, exercise_type = fetch_exercise_details(hevy_exercise_template_id)
-
-            # Insert into exercises
-            try:
-                cursor.execute(
-                    """
-                    INSERT OR IGNORE INTO exercises (hevy_exercise_template_id, exercise_name, primary_muscles, secondary_muscles, equipment, is_custom, type)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (hevy_exercise_template_id, exercise_data.get("title"), primary_muscles, secondary_muscles, equipment, is_custom, exercise_type)
-                )
-            except sqlite3.IntegrityError as e:
-                print(f"Error inserting exercise {hevy_exercise_template_id}: {e}")
-                continue
-
-            # Insert into workout_exercises
-            try:
-                cursor.execute(
-                    """
-                    INSERT INTO workout_exercises (hevy_workout_id, exercise_id, exercise_index, exercise_notes, superset_id)
-                    VALUES (?, ?, ?, ?, ?)
-                    """,
-                    (hevy_workout_id, hevy_exercise_template_id, exercise_data.get("exercise_index"), exercise_data.get("exercise_notes"), exercise_data.get("superset_id"))
-                )
-            except sqlite3.IntegrityError as e:
-                print(f"Error inserting workout_exercise for workout {hevy_workout_id} and exercise {hevy_exercise_template_id}: {e}")
-
->>>>>>> 90f275611fd18d1df5a84f49cb1ad7c12b1135ab
             # Insert sets
             for set_data in exercise_data.get("sets", []):
                 try:
-                    # Retrieve the workout_exercise_id for the current workout and exercise
                     cursor.execute(
                         """
-<<<<<<< HEAD
                         INSERT INTO sets (workout_exercise_id, set_index, set_type, weight_kg, reps, duration_seconds, rpe, custom_metric)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                         """,
@@ -343,31 +251,9 @@ def store_workouts_in_sqlite(workouts):
                     print(f"Error inserting set for workout_exercise_id {workout_exercise_id}: {e}")
                     continue
 
-=======
-                        SELECT workout_exercise_id FROM workout_exercises
-                        WHERE hevy_workout_id = ? AND exercise_id = ?
-                        """,
-                        (hevy_workout_id, hevy_exercise_template_id)
-                    )
-                    workout_exercise_id = cursor.fetchone()
-
-                    if workout_exercise_id:
-                        workout_exercise_id = workout_exercise_id[0]  # Extract the ID from the tuple
-                        cursor.execute(
-                            """
-                            INSERT INTO sets (workout_exercise_id, set_index, weight_kg, reps, rpe, custom_metric)
-                            VALUES (?, ?, ?, ?, ?, ?)
-                            """,
-                            (workout_exercise_id, set_data.get("set_index"), set_data.get("weight"), set_data.get("reps"), set_data.get("rpe"), set_data.get("custom_metric"))
-                        )
-                except sqlite3.IntegrityError as e:
-                    print(f"Error inserting set for workout {hevy_workout_id} and exercise {hevy_exercise_template_id}: {e}")
-
->>>>>>> 90f275611fd18d1df5a84f49cb1ad7c12b1135ab
     conn.commit()
     conn.close()
-
-    print(f"Finished processing all workouts in {time.perf_counter() - start_time:.2f} seconds.")
+    print(f"Finished processing all workouts in {time.perf_counter() - process_start_time:.2f} seconds.")
 
 def main():
     # Fetch all workouts from Hevy API
