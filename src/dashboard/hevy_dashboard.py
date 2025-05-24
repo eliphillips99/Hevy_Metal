@@ -150,7 +150,7 @@ if page == "Workouts":
     print(f"Debug: Workouts in Date Range ({start_date} to {end_date}) - {workouts_in_range}")
 
     # Fetch all unique muscle groups from the database
-    all_muscle_groups_query = query_get_all_unique_muscle_groups()
+    all_muscle_groups_query = query_get_all_unique_muscle_groups(start_date, end_date)
     all_muscle_groups = [row[0] for row in db.execute(all_muscle_groups_query).fetchall() if row[0]]
 
     # Set default muscle groups
@@ -178,11 +178,11 @@ if page == "Workouts":
             # Debugging: Log the fetched volumes
             print(f"Debug: Muscle '{muscle_name}', Primary Volume: {primary_volume}, Secondary Volume: {secondary_volume}")
 
-            # Append data for the chart
-            volume_data.append({"Muscle Group": muscle_name, "Muscle Role": "Primary Muscle", "Volume": primary_volume})
-            volume_data.append({"Muscle Group": muscle_name, "Muscle Role": "Secondary Muscle", "Volume": secondary_volume})
+            # Append data only if volumes are non-zero
+            if primary_volume > 0 or secondary_volume > 0:
+                volume_data.append({"Muscle Group": muscle_name, "Muscle Role": "Primary Muscle", "Volume": primary_volume})
+                volume_data.append({"Muscle Group": muscle_name, "Muscle Role": "Secondary Muscle", "Volume": secondary_volume})
 
-        # Check if there is any data to display
         if volume_data:
             # Create a DataFrame for the chart
             volume_df = pd.DataFrame(volume_data)
@@ -209,16 +209,15 @@ if page == "Workouts":
     key_exercises = ["Bench Press (Barbell)", "Squat (Belt)", "Bicep Curl (Barbell)", "Leg Extension (Machine)", "Lat Pulldown (Side Grip)"]
     records = []
 
+    # Update the 1RM and heaviest weight queries to include date range filtering
     for exercise in key_exercises:
-        # Fetch the highest calculated 1RM
         one_rm_query = query_get_one_rm_for_exercise(exercise, start_date, end_date)
         one_rm_result = db.execute(one_rm_query).fetchone()
-        print(f"Debug: 1RM Query Result for '{exercise}': {one_rm_result}")  # Debug print
+        print(f"Debug: Raw 1RM Query Result for '{exercise}': {one_rm_result}")  # Debug print
 
-        # Fetch the heaviest weight ever used
         heaviest_weight_query = query_get_heaviest_weight_for_exercise(exercise, start_date, end_date)
         heaviest_weight_result = db.execute(heaviest_weight_query).fetchone()
-        print(f"Debug: Heaviest Weight Query Result for '{exercise}': {heaviest_weight_result}")  # Debug print
+        print(f"Debug: Raw Heaviest Weight Query Result for '{exercise}': {heaviest_weight_result}")  # Debug print
 
         # Extract details for the 1RM
         if one_rm_result:
@@ -242,11 +241,11 @@ if page == "Workouts":
             "Exercise": exercise,
             "Calculated 1RM (lbs)": f"{calculated_one_rm:.1f}" if calculated_one_rm else None,
             "1RM Weight (lbs)": f"{one_rm_weight:.1f}" if one_rm_weight else None,
-            "1RM Reps": int(round(float(one_rm_reps))) if one_rm_reps else None,  # Ensure whole number
+            "1RM Reps": one_rm_reps,
             "1RM Date": one_rm_date,
             "Max Weight (lbs)": f"{max_weight:.1f}" if max_weight else None,
-            "Max Weight Reps": max_reps,  # Swap column location
-            "Max Weight Date": earliest_date  # Swap column location
+            "Max Weight Reps": max_reps,
+            "Max Weight Date": earliest_date
         })
 
     # Debug: Print all records before creating the DataFrame

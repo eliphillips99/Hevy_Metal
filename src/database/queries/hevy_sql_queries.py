@@ -3,7 +3,7 @@ from sqlalchemy import MetaData, Table, Column, Integer, String, ForeignKey, sel
 from sqlalchemy.types import DateTime, Date  # Correct import for DateTime and Date
 import datetime
 from src.database.schema import metadata, exercises_table, workouts_table, workout_exercises_table, sets, sleep_data_table, nutrition_data_table, diet_cycles_table, common_data
-from sqlalchemy import and_
+from sqlalchemy import and_, or_  # Ensure or_ is imported
 from sqlalchemy.orm import Session
 from src.database.connection import engine  # Assuming `engine` is defined in a connection module
 from src.database.database_utils import apply_date_filter
@@ -11,8 +11,10 @@ from src.database.database_utils import apply_date_filter
 # Initialize the database session
 db = Session(bind=engine)
 
-def query_apply_date_filter(query, table, start_date=None, end_date=None, date_column='start_time'):
-    """Applies a date range filter to a SQLAlchemy query on a specified date column."""
+def query_apply_date_filter(query, table, start_date=None, end_date=None, date_column='date'):
+    """
+    Applies a date range filter to a SQLAlchemy query on a specified date column.
+    """
     conditions = []
     if start_date:
         conditions.append(table.c[date_column] >= start_date)
@@ -20,7 +22,7 @@ def query_apply_date_filter(query, table, start_date=None, end_date=None, date_c
         conditions.append(table.c[date_column] <= end_date)
 
     if conditions:
-        return query.where(and_(*conditions))
+        query = query.where(and_(*conditions))
     return query
 
 def query_get_all_workouts(start_date=None, end_date=None):
@@ -61,7 +63,7 @@ def query_get_sets_for_exercise_in_workout(workout_id, exercise_name):
 def query_get_all_unique_exercise_names(start_date=None, end_date=None):
     """Returns a query for all unique exercise names."""
     query = select(exercises_table.c.exercise_name).distinct()
-    return query_apply_date_filter(query, workout_exercises_table, start_date, end_date)
+    return query_apply_date_filter(query, common_data, start_date, end_date, date_column='date')
 
 def query_get_exercise_counts(start_date=None, end_date=None):
     """Returns a query for counting the occurrences of each exercise."""
@@ -72,17 +74,18 @@ def query_get_exercise_counts(start_date=None, end_date=None):
         workout_exercises_table, exercises_table.c.exercise_id == workout_exercises_table.c.exercise_id
     ).join(
         workouts_table, workout_exercises_table.c.hevy_workout_id == workouts_table.c.hevy_workout_id
+    ).join(
+        common_data, workouts_table.c.common_data_id == common_data.c.common_data_id
     ).group_by(
         exercises_table.c.exercise_name
     ).order_by(
         func.count(workout_exercises_table.c.exercise_id).desc()
     )
-    return query_apply_date_filter(query, workouts_table, start_date, end_date)
+    return query_apply_date_filter(query, common_data, start_date, end_date, date_column='date')
 
 # More query functions using SQLAlchemy Core
 
 def query_get_current_diet_cycle(on_date=None):
-    from sqlalchemy import or_
     if on_date:
         return select(diet_cycles_table).\
             where(and_(diet_cycles_table.c.start_date <= on_date,
@@ -148,14 +151,33 @@ def query_get_secondary_muscle_volume(muscle_name, start_date=None, end_date=Non
 
     return query
 
-def query_get_all_unique_muscle_groups():
-    """Returns a query for all unique primary and secondary muscle groups."""
-    query = select(
-        func.distinct(exercises_table.c.primary_muscles).label("muscle_group")
-    ).union(
-        select(func.distinct(exercises_table.c.secondary_muscles).label("muscle_group"))
+def query_get_all_unique_muscle_groups(start_date=None, end_date=None):
+    """Returns a query for all unique primary and secondary muscle groups within a date range."""
+    primary_query = select(
+        func.distinct(func.trim(func.lower(exercises_table.c.primary_muscles))).label("muscle_group")
+    ).join(
+        workout_exercises_table, exercises_table.c.exercise_id == workout_exercises_table.c.exercise_id
+    ).join(
+        workouts_table, workout_exercises_table.c.hevy_workout_id == workouts_table.c.hevy_workout_id
+    ).join(
+        common_data, workouts_table.c.common_data_id == common_data.c.common_data_id
     )
-    return query
+
+    secondary_query = select(
+        func.distinct(func.trim(func.lower(exercises_table.c.secondary_muscles))).label("muscle_group")
+    ).join(
+        workout_exercises_table, exercises_table.c.exercise_id == workout_exercises_table.c.exercise_id
+    ).join(
+        workouts_table, workout_exercises_table.c.hevy_workout_id == workouts_table.c.hevy_workout_id
+    ).join(
+        common_data, workouts_table.c.common_data_id == common_data.c.common_data_id
+    )
+
+    # Apply date filters
+    primary_query = query_apply_date_filter(primary_query, common_data, start_date, end_date, date_column='date')
+    secondary_query = query_apply_date_filter(secondary_query, common_data, start_date, end_date, date_column='date')
+
+    return primary_query.union(secondary_query)
 
 def query_debug_sets_data():
     """Debug query to fetch all sets data with related exercise and workout details."""
@@ -330,6 +352,18 @@ def query_debug_broken_relationships():
     ).where(~sets.c.workout_exercise_id.in_(select(workout_exercises_table.c.workout_exercise_id)))
     return query
 
+def query_debug_broken_workout_relationships():
+    """
+    Debug query to find rows in the workouts table with broken relationships to other tables.
+    """
+    query = select(
+        workouts_table.c.hevy_workout_id,
+        workouts_table.c.common_data_id
+    ).where(
+        ~workouts_table.c.common_data_id.in_(select(common_data.c.common_data_id))
+    )
+    return query
+
 def query_debug_broken_set_relationships():
     """Debug query to find rows in workout_exercises without matching workout or exercise."""
     query = select(
@@ -380,19 +414,19 @@ def query_get_one_rm_for_exercise(exercise_name, start_date=None, end_date=None)
         sets.c.reps.label("reps"),
         (sets.c.weight_kg * (1 + (sets.c.reps / 30))).label("calculated_1rm")  # Epley formula
     ).join(
-        workout_exercises_table, sets.c.exercise_id == workout_exercises_table.c.exercise_id
+        workout_exercises_table, sets.c.workout_exercise_id == workout_exercises_table.c.workout_exercise_id
     ).join(
         exercises_table, workout_exercises_table.c.exercise_id == exercises_table.c.exercise_id
     ).join(
         workouts_table, workout_exercises_table.c.hevy_workout_id == workouts_table.c.hevy_workout_id
     ).join(
-        common_data, workouts_table.c.common_data_id == common_data.c.common_data_id  # Use common_data for date
+        common_data, workouts_table.c.common_data_id == common_data.c.common_data_id
     ).where(
-        exercises_table.c.exercise_name.ilike(exercise_name),  # Match exercise name
-        sets.c.reps > 0  # Ensure reps are greater than 0
+        exercises_table.c.exercise_name.ilike(f"%{exercise_name}%"),
+        sets.c.reps > 0
     )
 
-    # Apply date range filter
+    # Apply date range filter using common_data's date column
     query = query_apply_date_filter(query, common_data, start_date, end_date, date_column='date')
 
     # Group by set ID to ensure all sets are considered and calculate the max 1RM
@@ -414,26 +448,26 @@ def query_get_heaviest_weight_for_exercise(exercise_name, start_date=None, end_d
         common_data.c.date.label("date"),
         sets.c.reps.label("reps")
     ).join(
-        workout_exercises_table, sets.c.exercise_id == workout_exercises_table.c.exercise_id
+        workout_exercises_table, sets.c.workout_exercise_id == workout_exercises_table.c.workout_exercise_id
     ).join(
         exercises_table, workout_exercises_table.c.exercise_id == exercises_table.c.exercise_id
     ).join(
         workouts_table, workout_exercises_table.c.hevy_workout_id == workouts_table.c.hevy_workout_id
     ).join(
-        common_data, workouts_table.c.common_data_id == common_data.c.common_data_id  # Use common_data for date
+        common_data, workouts_table.c.common_data_id == common_data.c.common_data_id
     ).where(
-        exercises_table.c.exercise_name.ilike(exercise_name),
-        sets.c.weight_kg.isnot(None)  # Ensure weight is not null
+        exercises_table.c.exercise_name.ilike(f"%{exercise_name}%"),
+        sets.c.weight_kg.isnot(None)
     )
 
-    # Apply date range filter
+    # Apply date range filter using common_data's date column
     subquery = query_apply_date_filter(subquery, common_data, start_date, end_date, date_column='date')
 
     # Use a subquery to find the row with the maximum weight
     max_weight_subquery = subquery.alias("max_weight_subquery")
     query = select(
         max_weight_subquery.c.weight.label("max_weight"),
-        max_weight_subquery.c.date.label("earliest_date"),
+        func.min(max_weight_subquery.c.date).label("earliest_date"),
         max_weight_subquery.c.reps.label("reps")
     ).where(
         max_weight_subquery.c.weight == select(func.max(subquery.c.weight)).scalar_subquery()
@@ -450,9 +484,9 @@ def query_debug_sets_with_exercise_and_workout_details():
         exercises_table.c.exercise_name,
         workouts_table.c.start_time
     ).join(
-        exercises_table, sets.c.exercise_id == exercises_table.c.exercise_id  # Corrected join condition
+        workout_exercises_table, sets.c.workout_exercise_id == workout_exercises_table.c.workout_exercise_id  # Updated join condition
     ).join(
-        workout_exercises_table, exercises_table.c.exercise_id == workout_exercises_table.c.exercise_id  # Corrected join condition
+        exercises_table, workout_exercises_table.c.exercise_id == exercises_table.c.exercise_id  # Updated join condition
     ).join(
         workouts_table, workout_exercises_table.c.hevy_workout_id == workouts_table.c.hevy_workout_id  # Updated join condition
     )

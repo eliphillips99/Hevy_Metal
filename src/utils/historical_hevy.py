@@ -66,7 +66,6 @@ def fetch_exercise_details(exercise_template_id):
 
 def store_workouts_in_sqlite(workouts):
     """Stores Hevy workout data in the SQLite database using the updated schema."""
-    
     if not workouts:
         print("No workouts to store in the database.")
         return
@@ -87,16 +86,16 @@ def store_workouts_in_sqlite(workouts):
             print(f"Skipping invalid workout data: {workout}")
             continue
 
-        # Insert into common_data
-        common_data_id = None
+        # Use get_or_create_common_data_id to ensure correct common_data_id
         try:
-            cursor.execute("""
-                INSERT INTO common_data (date, source)
-                VALUES (?, ?)
-            """, (workout.get("start_time"), "Hevy API"))
-            common_data_id = cursor.lastrowid
-        except sqlite3.IntegrityError:
-            print("Error inserting into common_data.")
+            timestamp = datetime.fromisoformat(workout.get("start_time")) if workout.get("start_time") else None
+            if not timestamp:
+                print(f"Skipping workout {hevy_workout_id} due to missing start_time.")
+                continue
+
+            common_data_id = get_or_create_common_data_id(cursor, timestamp, "Hevy API")
+        except Exception as e:
+            print(f"Error getting or creating common_data_id for workout {hevy_workout_id}: {e}")
             continue
 
         # Insert into workouts
@@ -107,87 +106,67 @@ def store_workouts_in_sqlite(workouts):
         created_at = datetime.fromisoformat(workout.get("created_at").replace("Z", "+00:00")) if workout.get("created_at") else None
         updated_at = datetime.fromisoformat(workout.get("updated_at").replace("Z", "+00:00")) if workout.get("updated_at") else None
 
-        #print(f"Inserting workout: {hevy_workout_id, workout_name, start_time, end_time}")
-
         try:
-            cursor.execute("""
+            cursor.execute(
+                """
                 INSERT INTO workouts (common_data_id, hevy_workout_id, workout_name, workout_description, start_time, end_time, created_at, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """, (common_data_id, hevy_workout_id, workout_name, workout_description, start_time, end_time, created_at, updated_at))
+                """,
+                (common_data_id, hevy_workout_id, workout_name, workout_description, start_time, end_time, created_at, updated_at)
+            )
         except sqlite3.IntegrityError as e:
             print(f"Error inserting workout {hevy_workout_id}: {e}")
             continue
-        except sqlite3.OperationalError as e:
-            print(f"Operational error inserting workout {hevy_workout_id}: {e}")
-            continue
 
-        # Remove the redundant loop and ensure the logic is streamlined
-        for workout in workouts:
-            hevy_workout_id = workout.get("id")
+        # Process exercises
+        for exercise_data in workout.get("exercises", []):
+            exercise_template_id = exercise_data.get("exercise_template_id")
 
-            # Insert into workouts
+            # Insert into exercises
             try:
                 cursor.execute(
                     """
-                    INSERT OR IGNORE INTO workouts (common_data_id, hevy_workout_id, workout_name, workout_description, start_time, end_time, created_at, updated_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    INSERT OR IGNORE INTO exercises (hevy_exercise_template_id, exercise_name, primary_muscles, secondary_muscles, equipment, is_custom, type)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
                     """,
-                    (common_data_id, hevy_workout_id, workout.get("title"), workout.get("description"),
-                     workout.get("start_time"), workout.get("end_time"), workout.get("created_at"), workout.get("updated_at"))
+                    (exercise_template_id, exercise_data.get("title"), None, None, None, 0, None)
                 )
             except sqlite3.IntegrityError as e:
-                print(f"Error inserting workout {hevy_workout_id}: {e}")
+                print(f"Error inserting exercise {exercise_template_id}: {e}")
                 continue
 
-            # Process exercises
-            for exercise_data in workout.get("exercises", []):
-                exercise_template_id = exercise_data.get("exercise_template_id")
+            # Get exercise_id
+            cursor.execute("SELECT exercise_id FROM exercises WHERE hevy_exercise_template_id = ?", (exercise_template_id,))
+            exercise_id = cursor.fetchone()[0]
 
-                # Insert into exercises
+            # Insert into workout_exercises
+            try:
+                cursor.execute(
+                    """
+                    INSERT INTO workout_exercises (hevy_workout_id, exercise_id, exercise_index, exercise_notes, superset_id)
+                    VALUES (?, ?, ?, ?, ?)
+                    """,
+                    (hevy_workout_id, exercise_id, exercise_data.get("index"), exercise_data.get("notes"), exercise_data.get("superset_id"))
+                )
+                workout_exercise_id = cursor.lastrowid
+            except sqlite3.IntegrityError as e:
+                print(f"Error inserting workout_exercise for workout {hevy_workout_id}: {e}")
+                continue
+
+            # Insert sets
+            for set_data in exercise_data.get("sets", []):
                 try:
                     cursor.execute(
                         """
-                        INSERT OR IGNORE INTO exercises (hevy_exercise_template_id, exercise_name, primary_muscles, secondary_muscles, equipment, is_custom, type)
-                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                        INSERT INTO sets (workout_exercise_id, set_index, set_type, weight_kg, reps, duration_seconds, rpe, custom_metric)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                         """,
-                        (exercise_template_id, exercise_data.get("title"), None, None, None, 0, None)
+                        (workout_exercise_id, set_data.get("index"), set_data.get("type"), set_data.get("weight_kg"),
+                         set_data.get("reps"), set_data.get("duration_seconds"), set_data.get("rpe"), set_data.get("custom_metric"))
                     )
                 except sqlite3.IntegrityError as e:
-                    print(f"Error inserting exercise {exercise_template_id}: {e}")
+                    print(f"Error inserting set for workout_exercise_id {workout_exercise_id}: {e}")
                     continue
-
-                # Get exercise_id
-                cursor.execute("SELECT exercise_id FROM exercises WHERE hevy_exercise_template_id = ?", (exercise_template_id,))
-                exercise_id = cursor.fetchone()[0]
-
-                # Insert into workout_exercises
-                try:
-                    cursor.execute(
-                        """
-                        INSERT INTO workout_exercises (hevy_workout_id, exercise_id, exercise_index, exercise_notes, superset_id)
-                        VALUES (?, ?, ?, ?, ?)
-                        """,
-                        (hevy_workout_id, exercise_id, exercise_data.get("index"), exercise_data.get("notes"), exercise_data.get("superset_id"))
-                    )
-                    workout_exercise_id = cursor.lastrowid
-                except sqlite3.IntegrityError as e:
-                    print(f"Error inserting workout_exercise for workout {hevy_workout_id}: {e}")
-                    continue
-
-                # Insert sets
-                for set_data in exercise_data.get("sets", []):
-                    try:
-                        cursor.execute(
-                            """
-                            INSERT INTO sets (workout_exercise_id, set_index, set_type, weight_kg, reps, duration_seconds, rpe, custom_metric)
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                            """,
-                            (workout_exercise_id, set_data.get("index"), set_data.get("type"), set_data.get("weight_kg"),
-                             set_data.get("reps"), set_data.get("duration_seconds"), set_data.get("rpe"), set_data.get("custom_metric"))
-                        )
-                    except sqlite3.IntegrityError as e:
-                        print(f"Error inserting set for workout_exercise_id {workout_exercise_id}: {e}")
-                        continue
 
     conn.commit()
     conn.close()
