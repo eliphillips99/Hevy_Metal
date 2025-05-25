@@ -108,7 +108,7 @@ def query_get_all_diet_cycles(start_date=None, end_date=None):
     return query
 
 def query_get_primary_muscle_volume(muscle_name, start_date=None, end_date=None):
-    """Returns the total volume for exercises where the muscle is the primary muscle."""
+    """Returns the total volume in pounds for exercises where the muscle is the primary muscle."""
     conditions = [
         func.lower(func.trim(func.replace(exercises_table.c.primary_muscles, ',', ' '))).like(f"%{muscle_name.lower()}%")
     ]
@@ -118,7 +118,7 @@ def query_get_primary_muscle_volume(muscle_name, start_date=None, end_date=None)
         conditions.append(workouts_table.c.start_time <= end_date)
 
     query = select(
-        func.sum((func.coalesce(sets.c.weight_kg, 0) * func.coalesce(sets.c.reps, 0))).label('volume')
+        func.sum((func.coalesce(sets.c.weight_kg, 0) * func.coalesce(sets.c.reps, 0)) * 2.20462).label('volume_lbs')
     ).\
         join(workout_exercises_table, sets.c.workout_exercise_id == workout_exercises_table.c.workout_exercise_id).\
         join(exercises_table, workout_exercises_table.c.exercise_id == exercises_table.c.exercise_id).\
@@ -130,7 +130,7 @@ def query_get_primary_muscle_volume(muscle_name, start_date=None, end_date=None)
     return query
 
 def query_get_secondary_muscle_volume(muscle_name, start_date=None, end_date=None):
-    """Returns the total volume for exercises where the muscle is part of the secondary muscle group."""
+    """Returns the total volume in pounds for exercises where the muscle is part of the secondary muscle group."""
     conditions = [
         func.lower(func.trim(func.replace(exercises_table.c.secondary_muscles, ',', ' '))).like(f"%{muscle_name.lower()}%")
     ]
@@ -140,7 +140,7 @@ def query_get_secondary_muscle_volume(muscle_name, start_date=None, end_date=Non
         conditions.append(workouts_table.c.start_time <= end_date)
 
     query = select(
-        func.sum((func.coalesce(sets.c.weight_kg, 0) * func.coalesce(sets.c.reps, 0))).label('volume')
+        func.sum((func.coalesce(sets.c.weight_kg, 0) * func.coalesce(sets.c.reps, 0)) * 2.20462).label('volume_lbs')
     ).\
         join(workout_exercises_table, sets.c.workout_exercise_id == workout_exercises_table.c.workout_exercise_id).\
         join(exercises_table, workout_exercises_table.c.exercise_id == exercises_table.c.exercise_id).\
@@ -148,6 +148,14 @@ def query_get_secondary_muscle_volume(muscle_name, start_date=None, end_date=Non
 
     if conditions:
         query = query.where(and_(*conditions))
+
+    query = query.group_by(
+        sets.c.set_id,
+        sets.c.weight_kg,
+        sets.c.reps,
+        exercises_table.c.exercise_name,
+        workouts_table.c.hevy_workout_id
+    )
 
     return query
 
@@ -281,12 +289,13 @@ def query_debug_joined_sets_exercises_workouts():
         exercises_table.c.exercise_id,
         exercises_table.c.primary_muscles,
         exercises_table.c.secondary_muscles,
-        workouts_table.c.hevy_workout_id.label("workout_id"),  # Use hevy_workout_id as the correct key
+        workouts_table.c.hevy_workout_id.label("workout_id"),
         workouts_table.c.start_time
     ).\
-        join(exercises_table, sets.c.exercise_id == exercises_table.c.exercise_id, isouter=True).\
-        join(workout_exercises_table, workout_exercises_table.c.exercise_id == exercises_table.c.exercise_id, isouter=True).\
-        join(workouts_table, workout_exercises_table.c.hevy_workout_id == workouts_table.c.hevy_workout_id, isouter=True)  # Correct join
+        join(workout_exercises_table, sets.c.workout_exercise_id == workout_exercises_table.c.workout_exercise_id).\
+        join(exercises_table, workout_exercises_table.c.exercise_id == exercises_table.c.exercise_id).\
+        join(workouts_table, workout_exercises_table.c.hevy_workout_id == workouts_table.c.hevy_workout_id)
+
     return query
 
 def query_debug_no_date_filter(muscle_name):

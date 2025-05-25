@@ -90,14 +90,18 @@ def display_muscle_group_volume(muscle_name, start_date=None, end_date=None):
     primary_volume_query = query_get_primary_muscle_volume(muscle_name, start_date, end_date)
     secondary_volume_query = query_get_secondary_muscle_volume(muscle_name, start_date, end_date)
 
-    primary_volume = db.execute(primary_volume_query).scalar() or 0
-    secondary_volume = db.execute(secondary_volume_query).scalar() or 0
+    primary_volume_kg = db.execute(primary_volume_query).scalar() or 0
+    secondary_volume_kg = db.execute(secondary_volume_query).scalar() or 0
+
+    # Convert volumes to pounds
+    primary_volume_lbs = primary_volume_kg * 2.20462
+    secondary_volume_lbs = secondary_volume_kg * 2.20462
 
     # Create bar chart
     labels = ['Primary Muscle', 'Secondary Muscle']
-    volumes = [primary_volume, secondary_volume]
+    volumes = [primary_volume_lbs, secondary_volume_lbs]
 
     plt.bar(labels, volumes, color=['blue', 'orange'])
     plt.title(f"Exercise Volume for {muscle_name.capitalize()} ({start_date} to {end_date})")
-    plt.ylabel("Volume (Weight x Reps)")
+    plt.ylabel("Volume (Weight x Reps in lbs)")
     plt.show()

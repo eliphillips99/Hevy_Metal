@@ -70,6 +70,22 @@ from src.database.schema import (
 # Create a database session
 db = Session(bind=engine)
 
+
+def debug_volume_distribution(volume_data):
+    """
+    Prints the volume distribution data for muscle groups in a format
+    that is easily copiable into the chat.
+
+    :param volume_data: A list of dictionaries containing muscle group volume data.
+    """
+    print("Volume Distribution Data:")
+    print("[")
+    for entry in volume_data:
+        print("    {", end="")
+        print(", ".join(f"'{key}': {repr(value)}" for key, value in entry.items()), end="")
+        print("},")
+    print("]")
+
 def set_query_params(**params):
     """Helper function to set query parameters."""
     st.experimental_set_query_params(**params)  # Use the correct Streamlit function
@@ -154,17 +170,25 @@ if page == "Workouts":
             primary_volume_query = query_get_primary_muscle_volume(muscle_name, start_date, end_date)
             secondary_volume_query = query_get_secondary_muscle_volume(muscle_name, start_date, end_date)
 
-            primary_volume = db.execute(primary_volume_query).scalar() or 0
-            secondary_volume = db.execute(secondary_volume_query).scalar() or 0
+            primary_volume_kg = db.execute(primary_volume_query).scalar() or 0
+            secondary_volume_kg = db.execute(secondary_volume_query).scalar() or 0
+
+            # Convert volumes to pounds
+            primary_volume_lbs = primary_volume_kg * 2.20462
+            secondary_volume_lbs = secondary_volume_kg * 2.20462
 
             # Append data only if volumes are non-zero
-            if primary_volume > 0 or secondary_volume > 0:
-                volume_data.append({"Muscle Group": muscle_name, "Muscle Role": "Primary Muscle", "Volume": primary_volume})
-                volume_data.append({"Muscle Group": muscle_name, "Muscle Role": "Secondary Muscle", "Volume": secondary_volume})
+            if primary_volume_lbs > 0 or secondary_volume_lbs > 0:
+                volume_data.append({"Muscle Group": muscle_name, "Muscle Role": "Primary Muscle", "Volume": primary_volume_lbs})
+                volume_data.append({"Muscle Group": muscle_name, "Muscle Role": "Secondary Muscle", "Volume": secondary_volume_lbs})
 
         if volume_data:
             # Create a DataFrame for the chart
             volume_df = pd.DataFrame(volume_data)
+
+            # Display the raw volume data for vetting
+            st.subheader("Raw Volume Data")
+            st.dataframe(volume_df)
 
             # Create bar chart
             volume_chart = alt.Chart(volume_df).mark_bar().encode(
@@ -233,6 +257,47 @@ if page == "Workouts":
         st.table(records_df)
     else:
         st.info("No 1RM data available for the selected exercises and date range.")
+
+    # Display the raw data used for volume calculations
+    st.subheader("Raw Data for Volume Calculations")
+    raw_volume_data = []
+
+    for muscle_name in selected_muscle_groups:
+        primary_query = query_debug_joined_sets_exercises_workouts()
+        secondary_query = query_debug_joined_sets_exercises_workouts()
+
+        primary_results = db.execute(primary_query).fetchall()
+        secondary_results = db.execute(secondary_query).fetchall()
+
+        for result in primary_results:
+                weight = result[1] if result[1] is not None else 0
+                reps = result[2] if result[2] is not None else 0
+                raw_volume_data.append({
+                    "Muscle Group": muscle_name,
+                    "Muscle Role": "Primary Muscle",
+                    "Set ID": result[0],
+                    "Reps": reps,
+                    "Weight (kg)": weight,
+                    "Volume (Weight x Reps)": weight * reps
+                })
+
+        for result in secondary_results:
+            weight = result[1] if result[1] is not None else 0
+            reps = result[2] if result[2] is not None else 0
+            raw_volume_data.append({
+                "Muscle Group": muscle_name,
+                "Muscle Role": "Secondary Muscle",
+                "Set ID": result[0],
+                "Reps": reps,
+                "Weight (kg)": weight,
+                "Volume (Weight x Reps)": weight * reps
+            })
+
+    if raw_volume_data:
+        raw_volume_df = pd.DataFrame(raw_volume_data)
+        st.dataframe(raw_volume_df)
+    else:
+        st.info("No raw data available for the selected muscle groups and date range.")
 
     # Debug the volume distribution data
     if volume_data:
@@ -560,21 +625,6 @@ elif page == "Data Input":
                 st.error("No ongoing diet cycle found. Please start a new cycle first.")
 
 db.close()
-
-def debug_volume_distribution(volume_data):
-    """
-    Prints the volume distribution data for muscle groups in a format
-    that is easily copiable into the chat.
-
-    :param volume_data: A list of dictionaries containing muscle group volume data.
-    """
-    print("Volume Distribution Data:")
-    print("[")
-    for entry in volume_data:
-        print("    {", end="")
-        print(", ".join(f"'{key}': {repr(value)}" for key, value in entry.items()), end="")
-        print("},")
-    print("]")
 
 # Ensure the debug_volume_distribution function is defined before usage
 def debug_dashboard_values(muscle_group_volumes):
